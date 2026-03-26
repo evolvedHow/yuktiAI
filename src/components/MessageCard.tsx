@@ -1,36 +1,32 @@
 import React from "react";
-import { AgentId, Message } from "../types";
+import { AgentId, AgentNames, Message } from "../types";
 
-// ── Agent display metadata ────────────────────────────────────────────────────
+// ── Agent style metadata (colors only — names come from .md frontmatter) ──────
 
-const AGENT_META: Record<
+const AGENT_STYLE: Record<
   AgentId,
-  { label: string; initial: string; cardCls: string; avatarCls: string; labelCls: string }
+  { role: string; cardCls: string; avatarCls: string; labelCls: string }
 > = {
   moderator: {
-    label: "Arya · Moderator",
-    initial: "A",
+    role: "Moderator",
     cardCls: "bg-moderator-bg border-moderator-border",
     avatarCls: "bg-moderator-avatar",
     labelCls: "text-moderator-text",
   },
   advocate: {
-    label: "Priya · Advocate",
-    initial: "P",
+    role: "Advocate",
     cardCls: "bg-advocate-bg border-advocate-border",
     avatarCls: "bg-advocate-avatar",
     labelCls: "text-advocate-text",
   },
   critic: {
-    label: "Kiran · Critic",
-    initial: "K",
+    role: "Critic",
     cardCls: "bg-critic-bg border-critic-border",
     avatarCls: "bg-critic-avatar",
     labelCls: "text-critic-text",
   },
   audience: {
-    label: "Audience Question",
-    initial: "?",
+    role: "Audience",
     cardCls: "bg-audience-bg border-audience-border",
     avatarCls: "bg-audience-avatar",
     labelCls: "text-audience-text",
@@ -49,28 +45,34 @@ function Cursor() {
 
 interface Props {
   message: Message;
+  agentNames: AgentNames;
 }
 
-export function MessageCard({ message }: Props) {
-  const meta = AGENT_META[message.agent];
+export function MessageCard({ message, agentNames }: Props) {
+  const style = AGENT_STYLE[message.agent];
+  const { name, initial } = agentNames[message.agent];
+  // "Narada-Muni · Moderator" — omit role suffix for audience
+  const label = message.agent === "audience"
+    ? "Audience Question"
+    : `${name} · ${style.role}`;
   const ts = message.timestamp.slice(11, 16) + " UTC";
 
   // Audience card has a slightly different layout — it's a callout
   if (message.agent === "audience") {
     return (
       <div
-        className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${meta.cardCls} my-1`}
+        className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${style.cardCls} my-1`}
         role="note"
         aria-label="Audience question"
       >
         <span
-          className={`${meta.avatarCls} text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shrink-0 mt-0.5`}
+          className={`${style.avatarCls} text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shrink-0 mt-0.5`}
         >
-          {meta.initial}
+          {initial}
         </span>
         <div className="flex-1 min-w-0">
-          <div className={`text-xs font-semibold tracking-wide mb-0.5 ${meta.labelCls}`}>
-            {meta.label}
+          <div className={`text-xs font-semibold tracking-wide mb-0.5 ${style.labelCls}`}>
+            {label}
           </div>
           <p className="text-sm text-ink leading-relaxed italic">
             "{message.content}"
@@ -83,18 +85,18 @@ export function MessageCard({ message }: Props) {
 
   return (
     <div
-      className={`rounded-xl border px-4 py-3 ${meta.cardCls} my-1`}
+      className={`rounded-xl border px-4 py-3 ${style.cardCls} my-1`}
       role="article"
-      aria-label={`${meta.label} turn ${message.turn}`}
+      aria-label={`${label} turn ${message.turn}`}
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
         <span
-          className={`${meta.avatarCls} text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shrink-0`}
+          className={`${style.avatarCls} text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shrink-0`}
         >
-          {meta.initial}
+          {initial}
         </span>
-        <span className={`text-sm font-medium ${meta.labelCls}`}>{meta.label}</span>
+        <span className={`text-sm font-medium ${style.labelCls}`}>{label}</span>
         <span className="text-[10px] text-muted ml-auto">{ts}</span>
       </div>
 

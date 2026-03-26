@@ -2,7 +2,7 @@
  * Main debate transcript panel — auto-scrolls as new messages arrive.
  */
 import { useEffect, useRef } from "react";
-import { DebateStatus, GateState, Message, Topic } from "../types";
+import { AgentNames, DebateStatus, GateState, Message, Topic } from "../types";
 import { MessageCard } from "./MessageCard";
 import { TurnGate } from "./TurnGate";
 import { downloadMarkdown } from "../utils/exportMarkdown";
@@ -11,13 +11,14 @@ interface Props {
   topic: Topic | null;
   messages: Message[];
   status: DebateStatus;
+  agentNames: AgentNames;
   gateState: GateState;
   onAdvance: () => void;
   onPause: () => void;
   onResume: () => void;
 }
 
-export function DebateTranscript({ topic, messages, status, gateState, onAdvance, onPause, onResume }: Props) {
+export function DebateTranscript({ topic, messages, status, agentNames, gateState, onAdvance, onPause, onResume }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll on new content
@@ -81,13 +82,14 @@ export function DebateTranscript({ topic, messages, status, gateState, onAdvance
       {/* ── Scrollable transcript ──────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-0.5">
         {messages.map((m) => (
-          <MessageCard key={m.id} message={m} />
+          <MessageCard key={m.id} message={m} agentNames={agentNames} />
         ))}
 
         {/* Inter-turn gate — countdown bar with pause/advance controls */}
         {gateState.active && (
           <TurnGate
             gate={gateState}
+            agentNames={agentNames}
             onAdvance={onAdvance}
             onPause={onPause}
             onResume={onResume}

@@ -1,3 +1,8 @@
+---
+name: Amitabah
+initial: A
+---
+
 # Advocate — Persona & Rules of Engagement
 
 ## Role

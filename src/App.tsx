@@ -14,6 +14,7 @@ export default function App() {
     settings,
     updateSettings,
     error,
+    agentNames,
     startDebate,
     askQuestion,
     requestConclusion,
@@ -69,6 +70,7 @@ export default function App() {
           topic={activeTopic}
           messages={messages}
           status={status}
+          agentNames={agentNames}
           gateState={gateState}
           onAdvance={advanceTurn}
           onPause={pauseGate}

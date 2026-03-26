@@ -5,14 +5,7 @@
  * pause the countdown or advance immediately.
  */
 import { useEffect, useRef, useState } from "react";
-import { AgentId, GateState } from "../types";
-
-const AGENT_LABELS: Record<AgentId, string> = {
-  moderator: "Moderator",
-  advocate: "Advocate",
-  critic: "Critic",
-  audience: "Audience",
-};
+import { AgentId, AgentNames, GateState } from "../types";
 
 // Tailwind color classes per agent
 const BAR_COLOR: Record<AgentId, string> = {
@@ -31,6 +24,7 @@ const LABEL_COLOR: Record<AgentId, string> = {
 
 interface Props {
   gate: GateState;
+  agentNames: AgentNames;
   onAdvance: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -38,7 +32,7 @@ interface Props {
 
 const TICK_MS = 100;
 
-export function TurnGate({ gate, onAdvance, onPause, onResume }: Props) {
+export function TurnGate({ gate, agentNames, onAdvance, onPause, onResume }: Props) {
   const [remaining, setRemaining] = useState(gate.delayMs);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // track the onAdvance callback in a ref so the interval closure stays fresh
@@ -86,7 +80,7 @@ export function TurnGate({ gate, onAdvance, onPause, onResume }: Props) {
     <div className="flex items-center gap-3 mx-2 my-1.5 px-4 py-2.5 rounded-xl bg-white border border-border shadow-sm select-none">
       {/* Who's next */}
       <span className={`text-xs font-semibold shrink-0 ${LABEL_COLOR[agent]}`}>
-        Next&thinsp;·&thinsp;{AGENT_LABELS[agent]}
+        Next&thinsp;·&thinsp;{agentNames[agent].name}
       </span>
 
       {/* Clickable progress bar */}

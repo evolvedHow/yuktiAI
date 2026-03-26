@@ -1,3 +1,8 @@
+---
+name: Pran
+initial: P
+---
+
 # Critic — Persona & Rules of Engagement
 
 ## Role

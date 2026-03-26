@@ -8,7 +8,7 @@
  *  - Expose controls: startDebate, askQuestion, requestConclusion, stopDebate
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AgentId, DebateStatus, DEFAULT_SETTINGS, GateState, LLMSettings, Message, Topic } from "../types";
+import { AgentId, AgentNames, DebateStatus, DEFAULT_AGENT_NAMES, DEFAULT_SETTINGS, GateState, LLMSettings, Message, Topic } from "../types";
 import { loadPersonas, runDebate } from "../debate/orchestrator";
 
 const SETTINGS_KEY = "yuktiai_settings";
@@ -37,6 +37,7 @@ export function useDebate() {
   const [status, setStatus] = useState<DebateStatus>("idle");
   const [settings, setSettingsState] = useState<LLMSettings>(loadSettings);
   const [error, setError] = useState<string | null>(null);
+  const [agentNames, setAgentNames] = useState<AgentNames>(DEFAULT_AGENT_NAMES);
   const [gateState, setGateState] = useState<GateState>({
     active: false,
     nextAgent: null,
@@ -67,7 +68,10 @@ export function useDebate() {
       .catch(() => setError("Failed to load topics.json"));
 
     loadPersonas(base)
-      .then((p) => { personasRef.current = p; })
+      .then(({ personas, agentNames: names }) => {
+        personasRef.current = personas;
+        setAgentNames(names);
+      })
       .catch(() => setError("Failed to load agent personas"));
   }, []);
 
@@ -82,7 +86,7 @@ export function useDebate() {
 
   // ── Start debate ─────────────────────────────────────────────────────────
   const startDebate = useCallback(async (topic: Topic) => {
-    const personas = personasRef.current;
+    const personas = personasRef.current as Record<AgentId, string> | null;
     if (!personas) {
       setError("Agent personas not loaded yet — please wait a moment and try again.");
       return;
@@ -217,6 +221,7 @@ export function useDebate() {
     settings,
     updateSettings,
     error,
+    agentNames,
     startDebate,
     askQuestion,
     requestConclusion,

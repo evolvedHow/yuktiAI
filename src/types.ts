@@ -20,6 +20,19 @@ export interface Message {
 
 export type DebateStatus = "idle" | "active" | "concluding" | "done";
 
+export interface AgentDisplayMeta {
+  name: string;
+  initial: string;
+}
+export type AgentNames = Record<AgentId, AgentDisplayMeta>;
+
+export const DEFAULT_AGENT_NAMES: AgentNames = {
+  moderator: { name: "Moderator", initial: "M" },
+  advocate:  { name: "Advocate",  initial: "A" },
+  critic:    { name: "Critic",    initial: "C" },
+  audience:  { name: "Audience",  initial: "?" },
+};
+
 export interface GateState {
   active: boolean;
   nextAgent: AgentId | null;
