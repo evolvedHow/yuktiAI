@@ -1,0 +1,27 @@
+[
+  {
+    "id": "ubi",
+    "title": "Universal Basic Income",
+    "description": "Should governments implement a universal basic income — a regular, unconditional cash payment to every citizen — as a response to automation, inequality, and poverty? Debate covers fiscal sustainability, labor-market effects, and political feasibility."
+  },
+  {
+    "id": "charter_cities",
+    "title": "Charter Cities & Special Economic Zones",
+    "description": "Should developing nations create semi-autonomous 'charter cities' with independent governance, legal systems, and economic rules to attract investment and accelerate development? Debate covers sovereignty, inequality, and post-colonial concerns."
+  },
+  {
+    "id": "digital_privacy",
+    "title": "Encryption vs. Lawful Access",
+    "description": "Should tech companies be required to provide law-enforcement backdoor access to end-to-end encrypted communications? Debate covers public safety, cybersecurity, civil liberties, and the technical impossibility of 'safe' backdoors."
+  },
+  {
+    "id": "ranked_choice",
+    "title": "Ranked-Choice Voting for National Elections",
+    "description": "Should the United States (and other plurality-voting democracies) adopt ranked-choice voting for federal elections? Debate covers third-party viability, ballot complexity, strategic voting, and representational outcomes."
+  },
+  {
+    "id": "ai_regulation",
+    "title": "Regulating Frontier AI Development",
+    "description": "Should governments impose mandatory safety evaluations, capability thresholds, or compute limits on frontier AI development? Debate covers innovation slowdown, national competitiveness, existential risk, and enforcement challenges."
+  }
+]
