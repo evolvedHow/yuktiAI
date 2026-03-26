@@ -6,7 +6,7 @@ import react from "@vitejs/plugin-react";
 //   2. GITHUB_REPOSITORY env var → derive sub-path automatically (e.g. "user/yuktiAI" → "/yuktiAI/")
 //   3. "/" for local dev
 const repoName = process.env.GITHUB_REPOSITORY?.split("/")[1];
-const base = process.env.VITE_BASE_PATH ?? (repoName ? `/${repoName}/` : "/");
+const base = process.env.VITE_BASE_PATH ?? (repoName ? `/${repoName}/` : "/yuktiAI/");
 
 export default defineConfig({
   plugins: [react()],
