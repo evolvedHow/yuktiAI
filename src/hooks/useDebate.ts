@@ -8,7 +8,7 @@
  *  - Expose controls: startDebate, askQuestion, requestConclusion, stopDebate
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AgentId, DebateStatus, DEFAULT_SETTINGS, LLMSettings, Message, Topic } from "../types";
+import { AgentId, DebateStatus, DEFAULT_SETTINGS, GateState, LLMSettings, Message, Topic } from "../types";
 import { loadPersonas, runDebate } from "../debate/orchestrator";
 
 const SETTINGS_KEY = "yuktiai_settings";
@@ -37,6 +37,12 @@ export function useDebate() {
   const [status, setStatus] = useState<DebateStatus>("idle");
   const [settings, setSettingsState] = useState<LLMSettings>(loadSettings);
   const [error, setError] = useState<string | null>(null);
+  const [gateState, setGateState] = useState<GateState>({
+    active: false,
+    nextAgent: null,
+    paused: false,
+    delayMs: 0,
+  });
 
   // Personas loaded once at mount
   const personasRef = useRef<Record<AgentId, string> | null>(null);
@@ -48,6 +54,9 @@ export function useDebate() {
 
   // Active message id being streamed
   const activeIdRef = useRef<string | null>(null);
+
+  // Gate resolver ref — holds the resolve fn of the current waitForGate promise
+  const gateResolverRef = useRef<(() => void) | null>(null);
 
   // ── Load topics + personas ───────────────────────────────────────────────
   useEffect(() => {
@@ -89,6 +98,8 @@ export function useDebate() {
     concludeFlagRef.current = false;
     pendingQRef.current = null;
     activeIdRef.current = null;
+    gateResolverRef.current = null;
+    setGateState({ active: false, nextAgent: null, paused: false, delayMs: 0 });
 
     setActiveTopic(topic);
     setMessages([]);
@@ -103,6 +114,17 @@ export function useDebate() {
       },
       shouldConclude: () => concludeFlagRef.current,
       signal: abortRef.current.signal,
+      waitForGate: (nextAgent: AgentId): Promise<void> => {
+        return new Promise<void>((resolve) => {
+          gateResolverRef.current = resolve;
+          setGateState({
+            active: true,
+            nextAgent,
+            paused: false,
+            delayMs: settings.interTurnDelayMs,
+          });
+        });
+      },
     };
 
     const callbacks = {
@@ -170,6 +192,23 @@ export function useDebate() {
     setStatus("done");
   }, []);
 
+  const advanceTurn = useCallback(() => {
+    const resolve = gateResolverRef.current;
+    if (resolve) {
+      gateResolverRef.current = null;
+      setGateState((prev) => ({ ...prev, active: false }));
+      resolve();
+    }
+  }, []);
+
+  const pauseGate = useCallback(() => {
+    setGateState((prev) => ({ ...prev, paused: true }));
+  }, []);
+
+  const resumeGate = useCallback(() => {
+    setGateState((prev) => ({ ...prev, paused: false }));
+  }, []);
+
   return {
     topics,
     activeTopic,
@@ -182,5 +221,9 @@ export function useDebate() {
     askQuestion,
     requestConclusion,
     stopDebate,
+    gateState,
+    advanceTurn,
+    pauseGate,
+    resumeGate,
   };
 }

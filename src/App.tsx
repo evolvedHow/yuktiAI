@@ -17,6 +17,10 @@ export default function App() {
     startDebate,
     askQuestion,
     requestConclusion,
+    gateState,
+    advanceTurn,
+    pauseGate,
+    resumeGate,
   } = useDebate();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -65,6 +69,10 @@ export default function App() {
           topic={activeTopic}
           messages={messages}
           status={status}
+          gateState={gateState}
+          onAdvance={advanceTurn}
+          onPause={pauseGate}
+          onResume={resumeGate}
         />
       </main>
 

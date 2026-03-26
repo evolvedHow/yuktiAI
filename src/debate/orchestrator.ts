@@ -49,6 +49,8 @@ export interface OrchestratorControl {
   shouldConclude: () => boolean;
   /** AbortSignal — caller cancels this to stop mid-debate */
   signal: AbortSignal;
+  /** Called between turns; resolves when the user advances or countdown expires */
+  waitForGate: (nextAgent: AgentId) => Promise<void>;
 }
 
 // ── Message history builder ───────────────────────────────────────────────────
@@ -144,14 +146,6 @@ export async function runDebate(
   control: OrchestratorControl,
 ): Promise<void> {
   const history: HistoryEntry[] = [];
-  const delay = (ms: number) =>
-    new Promise<void>((res, rej) => {
-      const t = setTimeout(res, ms);
-      control.signal.addEventListener("abort", () => {
-        clearTimeout(t);
-        rej(new DOMException("Aborted", "AbortError"));
-      });
-    });
 
   let turn = 0;
 
@@ -162,7 +156,7 @@ export async function runDebate(
     `Please open the debate on the following topic:\n\n**${topic.title}**\n\n${topic.description}`,
   );
   turn++;
-  await delay(settings.interTurnDelayMs);
+  await control.waitForGate(CYCLE[0]);
 
   // ── Main loop ─────────────────────────────────────────────────────────────
   let concluded = false;
@@ -197,7 +191,8 @@ export async function runDebate(
       suffix,
     );
     turn++;
-    await delay(settings.interTurnDelayMs);
+    const nextAgentInCycle = CYCLE[(turn - 1) % 3];
+    await control.waitForGate(nextAgentInCycle);
   }
 
   // Auto-close if max_turns hit

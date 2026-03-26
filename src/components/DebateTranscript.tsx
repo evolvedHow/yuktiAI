@@ -2,17 +2,22 @@
  * Main debate transcript panel — auto-scrolls as new messages arrive.
  */
 import { useEffect, useRef } from "react";
-import { DebateStatus, Message, Topic } from "../types";
+import { DebateStatus, GateState, Message, Topic } from "../types";
 import { MessageCard } from "./MessageCard";
+import { TurnGate } from "./TurnGate";
 import { downloadMarkdown } from "../utils/exportMarkdown";
 
 interface Props {
   topic: Topic | null;
   messages: Message[];
   status: DebateStatus;
+  gateState: GateState;
+  onAdvance: () => void;
+  onPause: () => void;
+  onResume: () => void;
 }
 
-export function DebateTranscript({ topic, messages, status }: Props) {
+export function DebateTranscript({ topic, messages, status, gateState, onAdvance, onPause, onResume }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll on new content
@@ -79,15 +84,25 @@ export function DebateTranscript({ topic, messages, status }: Props) {
           <MessageCard key={m.id} message={m} />
         ))}
 
-        {/* Typing indicator while waiting for next turn_start */}
-        {status === "active" && messages.length > 0 && !messages[messages.length - 1].streaming && (
+        {/* Inter-turn gate — countdown bar with pause/advance controls */}
+        {gateState.active && (
+          <TurnGate
+            gate={gateState}
+            onAdvance={onAdvance}
+            onPause={onPause}
+            onResume={onResume}
+          />
+        )}
+
+        {/* Typing indicator — only while LLM is generating (gate not active) */}
+        {status === "active" && !gateState.active && messages.length > 0 && !messages[messages.length - 1].streaming && (
           <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted">
             <span className="flex gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-muted animate-bounce [animation-delay:0ms]" />
               <span className="w-1.5 h-1.5 rounded-full bg-muted animate-bounce [animation-delay:150ms]" />
               <span className="w-1.5 h-1.5 rounded-full bg-muted animate-bounce [animation-delay:300ms]" />
             </span>
-            <span>Preparing next turn…</span>
+            <span>Generating response…</span>
           </div>
         )}
 

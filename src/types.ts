@@ -20,6 +20,13 @@ export interface Message {
 
 export type DebateStatus = "idle" | "active" | "concluding" | "done";
 
+export interface GateState {
+  active: boolean;
+  nextAgent: AgentId | null;
+  paused: boolean;
+  delayMs: number;
+}
+
 // ── LLM settings (persisted to localStorage) ─────────────────────────────────
 
 export interface LLMSettings {
@@ -42,7 +49,7 @@ export const DEFAULT_SETTINGS: LLMSettings = {
   apiKey:           import.meta.env.VITE_LLM_API_KEY   ?? "",
   model:            import.meta.env.VITE_LLM_MODEL      ?? "llama-3.3-70b-versatile",
   maxTokensPerTurn: Number(import.meta.env.VITE_MAX_TOKENS   ?? 420),
-  interTurnDelayMs: Number(import.meta.env.VITE_TURN_DELAY_MS ?? 800),
+  interTurnDelayMs: Number(import.meta.env.VITE_TURN_DELAY_MS ?? 8000),
   maxTurns:         Number(import.meta.env.VITE_MAX_TURNS     ?? 14),
 };
 
