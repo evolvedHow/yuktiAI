@@ -1,0 +1,44 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# YuktiAI Topic File — Irreverence
+#
+# agents:   Override the display names for this topic set.
+#           Remove this section to use the defaults from the agent .md files.
+#
+# topics:   List of debate topics in this set.
+#           Each topic must have: id, title, description.
+# ──────────────────────────────────────────────────────────────────────────────
+
+agents:
+  moderator:
+    name: Ali-G
+    initial: G
+  advocate:
+    name: Borat
+    initial: B
+  critic:
+    name: Pedro
+    initial: P
+
+topics:
+  - id: paper_plastic
+    title: "Paper vs. Plastic: The Great Bag Debate"
+    description: >
+      Which is the superior grocery bag material: the biodegradable, renewable paper
+      or the durable, reusable plastic? A light-hearted battle of convenience, ecology,
+      and consumer guilt.
+  - id: soccer_football
+    title: "Soccer vs. Football: The Global Game Debate"
+    description: >
+      Which is the superior sport: the world's game of soccer (football) or the
+      American gridiron football? A spirited clash of culture, athleticism, and
+      fan passion.
+  - id: batman_superman
+    title: "Batman vs. Superman: The Ultimate Superhero Showdown"
+    description: >
+      Who would win in a fight: the brooding, resourceful Batman or the godlike,
+      virtuous Superman? A playful debate of power, morality, and comic-book lore.
+  - id: dosa_iddlis
+    title: "Dosas vs. Idlis: The Ultimate South Indian Breakfast Debate"
+    description: >
+      Which is the superior South Indian breakfast dish: the crispy, savory dosa
+      or the soft, steamed idli? A light-hearted battle of tradition, texture, and taste.

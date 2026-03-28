@@ -1,0 +1,46 @@
+[
+  {
+    "file": "general_debates.yml",
+    "label": "General Debates"
+  },
+  {
+    "file": "humor.yml",
+    "label": "Humor"
+  },
+  {
+    "file": "irreverence.yml",
+    "label": "Irreverence"
+  },
+  {
+    "file": "science.yml",
+    "label": "Science"
+  },
+  {
+    "file": "technology.yml",
+    "label": "Technology"
+  },
+  {
+    "file": "politics.yml",
+    "label": "Politics"
+  },
+  {
+    "file": "spiritual.yml",
+    "label": "Spiritual"
+  },
+  {
+    "file": "sports.yml",
+    "label": "Sports"
+  },
+  {
+    "file": "entertainment.yml",
+    "label": "Entertainment"
+  },
+  {
+    "file": "history.yml",
+    "label": "History"
+  },
+  {
+    "file": "socio-econ.yml",
+    "label": "Socio-Economic"
+  }
+]

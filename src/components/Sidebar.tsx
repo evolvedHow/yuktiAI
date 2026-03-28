@@ -1,15 +1,19 @@
 /**
  * Left sidebar:
  *   - YuktiAI branding
+ *   - Topic-file dropdown (select which .yml file to load)
  *   - Topic list (scrollable)
  *   - Audience controls (pinned to bottom)
  *   - On mobile: becomes a slide-in drawer triggered by a hamburger button
  */
 import { useState } from "react";
-import { DebateStatus, Topic } from "../types";
+import { DebateStatus, Topic, TopicFileEntry } from "../types";
 import { AudienceControls } from "./AudienceControls";
 
 interface Props {
+  topicFiles: TopicFileEntry[];
+  selectedTopicFile: TopicFileEntry | null;
+  onSelectTopicFile: (file: string) => void;
   topics: Topic[];
   activeTopic: Topic | null;
   status: DebateStatus;
@@ -20,6 +24,9 @@ interface Props {
 }
 
 export function Sidebar({
+  topicFiles,
+  selectedTopicFile,
+  onSelectTopicFile,
   topics,
   activeTopic,
   status,
@@ -48,10 +55,28 @@ export function Sidebar({
         </button>
       </div>
 
+      {/* Topic-file selector */}
+      {topicFiles.length > 1 && (
+        <div className="shrink-0 px-3 pb-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted px-2 mb-1.5">
+            Topic Set
+          </p>
+          <select
+            value={selectedTopicFile?.file ?? ""}
+            onChange={(e) => onSelectTopicFile(e.target.value)}
+            className="w-full text-xs border border-border rounded-lg px-2.5 py-1.5 bg-white text-ink focus:outline-none focus:ring-1 focus:ring-moderator-avatar/40 cursor-pointer"
+          >
+            {topicFiles.map((tf) => (
+              <option key={tf.file} value={tf.file}>{tf.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Topic list */}
       <div className="flex-1 overflow-y-auto px-3 pb-2">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted px-2 mb-2">
-          Topics
+          {selectedTopicFile?.label ?? "Topics"}
         </p>
         <ul className="space-y-0.5">
           {topics.map((topic) => {

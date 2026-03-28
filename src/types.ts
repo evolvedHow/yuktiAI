@@ -8,6 +8,22 @@ export interface Topic {
   description: string;
 }
 
+/** Entry in public/topics/index.json */
+export interface TopicFileEntry {
+  file: string;
+  label: string;
+}
+
+/** Parsed content of a .yml topic file */
+export interface TopicFileContent {
+  agents?: {
+    moderator?: Partial<AgentDisplayMeta>;
+    advocate?: Partial<AgentDisplayMeta>;
+    critic?: Partial<AgentDisplayMeta>;
+  };
+  topics: Topic[];
+}
+
 export interface Message {
   id: string;
   agent: AgentId;

@@ -7,6 +7,9 @@ import { Topic } from "./types";
 
 export default function App() {
   const {
+    topicFiles,
+    selectedTopicFile,
+    selectTopicFile,
     topics,
     activeTopic,
     messages,
@@ -40,6 +43,9 @@ export default function App() {
     <div className="flex h-screen overflow-hidden bg-surface">
       {/* Left sidebar */}
       <Sidebar
+        topicFiles={topicFiles}
+        selectedTopicFile={selectedTopicFile}
+        onSelectTopicFile={selectTopicFile}
         topics={topics}
         activeTopic={activeTopic}
         status={status}

@@ -1,0 +1,70 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# YuktiAI Topic File — General Debates
+#
+# agents:   Override the display names for this topic set.
+#           Remove this section to use the defaults from the agent .md files.
+#
+# topics:   List of debate topics in this set.
+#           Each topic must have: id, title, description.
+# ──────────────────────────────────────────────────────────────────────────────
+
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+  advocate:
+    name: Amitabah
+    initial: A
+  critic:
+    name: Pran
+    initial: P
+
+topics:
+  - id: dosa_vs_iddlis
+    title: "Dosas vs. Idlis: The Ultimate South Indian Breakfast Debate"
+    description: >
+      Which is the superior South Indian breakfast dish: the crispy, savory dosa
+      or the soft, steamed idli? A light-hearted battle of tradition, texture, and taste.
+
+  - id: climate
+    title: "Climate Change Mitigation"
+    description: >
+      What are the most effective and equitable policies for reducing greenhouse gas
+      emissions and limiting global warming to 1.5°C? Debate covers carbon pricing,
+      renewable energy, geoengineering, and international cooperation.
+
+  - id: ubi
+    title: "Universal Basic Income"
+    description: >
+      Should governments implement a universal basic income — a regular, unconditional
+      cash payment to every citizen — as a response to automation, inequality, and
+      poverty? Debate covers fiscal sustainability, labor-market effects, and political
+      feasibility.
+
+  - id: charter_cities
+    title: "Charter Cities & Special Economic Zones"
+    description: >
+      Should developing nations create semi-autonomous 'charter cities' with independent
+      governance, legal systems, and economic rules to attract investment and accelerate
+      development? Debate covers sovereignty, inequality, and post-colonial concerns.
+
+  - id: digital_privacy
+    title: "Encryption vs. Lawful Access"
+    description: >
+      Should tech companies be required to provide law-enforcement backdoor access to
+      end-to-end encrypted communications? Debate covers public safety, cybersecurity,
+      civil liberties, and the technical impossibility of 'safe' backdoors.
+
+  - id: ranked_choice
+    title: "Ranked-Choice Voting for National Elections"
+    description: >
+      Should plurality-voting democracies adopt ranked-choice voting for federal
+      elections? Debate covers third-party viability, ballot complexity, strategic
+      voting, and representational outcomes.
+
+  - id: ai_regulation
+    title: "Regulating Frontier AI Development"
+    description: >
+      Should governments impose mandatory safety evaluations, capability thresholds,
+      or compute limits on frontier AI development? Debate covers innovation slowdown,
+      national competitiveness, existential risk, and enforcement challenges.

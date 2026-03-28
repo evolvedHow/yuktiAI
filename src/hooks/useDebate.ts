@@ -2,13 +2,19 @@
  * useDebate — central React hook that owns all debate state and orchestration.
  *
  * Responsibilities:
- *  - Load topics and agent personas on mount
+ *  - Load topic-file index and agent personas on mount
+ *  - Load topics (+ optional agent name overrides) from selected .yml file
  *  - Manage LLMSettings (read/write localStorage)
  *  - Drive the orchestrator and translate callbacks into React state updates
  *  - Expose controls: startDebate, askQuestion, requestConclusion, stopDebate
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AgentId, AgentNames, DebateStatus, DEFAULT_AGENT_NAMES, DEFAULT_SETTINGS, GateState, LLMSettings, Message, Topic } from "../types";
+import { load as yamlLoad } from "js-yaml";
+import {
+  AgentId, AgentNames, DebateStatus, DEFAULT_AGENT_NAMES,
+  DEFAULT_SETTINGS, GateState, LLMSettings, Message, Topic,
+  TopicFileContent, TopicFileEntry,
+} from "../types";
 import { loadPersonas, runDebate } from "../debate/orchestrator";
 
 const SETTINGS_KEY = "yuktiai_settings";
@@ -31,6 +37,8 @@ function nextId() { return String(++_msgCounter); }
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useDebate() {
+  const [topicFiles, setTopicFiles] = useState<TopicFileEntry[]>([]);
+  const [selectedTopicFile, setSelectedTopicFile] = useState<TopicFileEntry | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [activeTopic, setActiveTopic] = useState<Topic | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -45,8 +53,10 @@ export function useDebate() {
     delayMs: 0,
   });
 
-  // Personas loaded once at mount
+  // Personas loaded once at mount (names from .md frontmatter)
   const personasRef = useRef<Record<AgentId, string> | null>(null);
+  // Base agent names derived from persona .md files
+  const baseAgentNamesRef = useRef<AgentNames>(DEFAULT_AGENT_NAMES);
 
   // Refs for mutable orchestrator controls (no re-render needed)
   const pendingQRef = useRef<string | null>(null);
@@ -59,21 +69,78 @@ export function useDebate() {
   // Gate resolver ref — holds the resolve fn of the current waitForGate promise
   const gateResolverRef = useRef<(() => void) | null>(null);
 
-  // ── Load topics + personas ───────────────────────────────────────────────
+  // ── Load a specific topic yml file ──────────────────────────────────────
+  const loadTopicFile = useCallback(async (entry: TopicFileEntry, base: string) => {
+    try {
+      const res = await fetch(`${base}/topics/${entry.file}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      const parsed = yamlLoad(text) as TopicFileContent;
+
+      if (!parsed?.topics || !Array.isArray(parsed.topics)) {
+        throw new Error("YAML file must have a 'topics' array");
+      }
+
+      setTopics(parsed.topics);
+
+      // Merge agent name overrides from the yml file on top of base persona names
+      if (parsed.agents) {
+        const overrides = parsed.agents;
+        setAgentNames((prev) => ({
+          ...prev,
+          moderator: overrides.moderator
+            ? { ...baseAgentNamesRef.current.moderator, ...overrides.moderator }
+            : baseAgentNamesRef.current.moderator,
+          advocate: overrides.advocate
+            ? { ...baseAgentNamesRef.current.advocate, ...overrides.advocate }
+            : baseAgentNamesRef.current.advocate,
+          critic: overrides.critic
+            ? { ...baseAgentNamesRef.current.critic, ...overrides.critic }
+            : baseAgentNamesRef.current.critic,
+        }));
+      } else {
+        setAgentNames(baseAgentNamesRef.current);
+      }
+    } catch (err) {
+      setError(`Failed to load topic file "${entry.file}": ${(err as Error).message}`);
+    }
+  }, []);
+
+  // ── Load index + personas on mount ──────────────────────────────────────
   useEffect(() => {
     const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-    fetch(`${base}/topics.json`)
-      .then((r) => r.json())
-      .then((data: Topic[]) => setTopics(data))
-      .catch(() => setError("Failed to load topics.json"));
 
+    // Load topic file index
+    fetch(`${base}/topics/index.json`)
+      .then((r) => r.json())
+      .then(async (entries: TopicFileEntry[]) => {
+        setTopicFiles(entries);
+        if (entries.length > 0) {
+          setSelectedTopicFile(entries[0]);
+          await loadTopicFile(entries[0], base);
+        }
+      })
+      .catch(() => setError("Failed to load topics/index.json"));
+
+    // Load agent personas from .md files
     loadPersonas(base)
       .then(({ personas, agentNames: names }) => {
         personasRef.current = personas;
+        baseAgentNamesRef.current = names;
+        // Will be overridden if a topic file has agent overrides, but set base now
         setAgentNames(names);
       })
       .catch(() => setError("Failed to load agent personas"));
-  }, []);
+  }, [loadTopicFile]);
+
+  // ── Switch topic file ────────────────────────────────────────────────────
+  const selectTopicFile = useCallback((file: string) => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    const entry = topicFiles.find((f) => f.file === file);
+    if (!entry) return;
+    setSelectedTopicFile(entry);
+    void loadTopicFile(entry, base);
+  }, [topicFiles, loadTopicFile]);
 
   // ── Settings ─────────────────────────────────────────────────────────────
   const updateSettings = useCallback((patch: Partial<LLMSettings>) => {
@@ -214,6 +281,9 @@ export function useDebate() {
   }, []);
 
   return {
+    topicFiles,
+    selectedTopicFile,
+    selectTopicFile,
     topics,
     activeTopic,
     messages,

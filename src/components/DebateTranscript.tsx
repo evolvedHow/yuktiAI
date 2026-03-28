@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { AgentNames, DebateStatus, GateState, Message, Topic } from "../types";
 import { MessageCard } from "./MessageCard";
 import { TurnGate } from "./TurnGate";
-import { downloadMarkdown } from "../utils/exportMarkdown";
+import { printDebatePDF } from "../utils/exportPDF";
 
 interface Props {
   topic: Topic | null;
@@ -69,11 +69,11 @@ export function DebateTranscript({ topic, messages, status, agentNames, gateStat
           </span>
           {messages.length > 0 && status === "done" && (
             <button
-              onClick={() => downloadMarkdown(topic, messages)}
+              onClick={() => printDebatePDF(topic, messages, agentNames)}
               className="text-xs text-muted hover:text-ink border border-border rounded-lg px-3 py-1 transition-colors hover:bg-white"
-              title="Download full debate as Markdown"
+              title="Open print dialog to save as PDF"
             >
-              Export .md
+              Export PDF
             </button>
           )}
         </div>
