@@ -127,7 +127,7 @@ export function useDebate() {
     const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
     // Load topic file index
-    fetch(`${base}/topics/index.json`)
+    fetch(`${base}/topics/index.json`, { cache: "no-cache" })
       .then((r) => r.json())
       .then(async (entries: TopicFileEntry[]) => {
         setTopicFiles(entries);
