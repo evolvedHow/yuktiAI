@@ -28,6 +28,10 @@
     "label": "Spiritual"
   },
   {
+    "file": "vedanta.yml",
+    "label": "Vedanta"
+  },
+  {
     "file": "sports.yml",
     "label": "Sports"
   },

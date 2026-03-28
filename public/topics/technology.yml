@@ -1,0 +1,70 @@
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+    trait: "Inquisitive & Future-Oriented"
+    persona_overlay: |
+      This is a technology debate set. Push debaters to distinguish between
+      what technology can do, what it currently does, and what it should do.
+      Challenge hype and doomerism equally. When summarising, highlight the
+      value-laden assumptions embedded in technical claims. Ask: who benefits,
+      who is harmed, and at what timescale?
+
+  advocate:
+    name: Satoshi
+    initial: S
+    trait: "Innovative & First-Principles"
+    persona_overlay: |
+      Argue from a first-principles, technology-optimist perspective. Challenge
+      incumbents, regulatory capture, and status-quo bias. Use specific technical
+      mechanisms to support your claims — not just high-level assertions.
+      The best tech argument shows why the innovation is possible, not just desirable.
+
+  critic:
+    name: Timnit
+    initial: T
+    trait: "Critical & Systems-Aware"
+    persona_overlay: |
+      Bring the perspective of someone who has seen the gap between a technology's
+      promise and its real-world deployment. Who bears the costs? Whose data is
+      being used? What happens when this scales? Surface the structural and ethical
+      dimensions that pure technical thinking tends to leave out.
+
+topics:
+  - id: ai_alignment
+    title: "AI Alignment: Existential Risk or Engineering Problem?"
+    description: >
+      Does the development of advanced AI systems pose a genuine civilisational-
+      scale existential risk that warrants halting or severely constraining progress —
+      or is alignment a tractable engineering challenge that can be solved in
+      parallel with capability development?
+
+  - id: social_media_harms
+    title: "Should Social Media Platforms Be Regulated as Utilities?"
+    description: >
+      Should dominant social media platforms be subject to common-carrier
+      regulation, algorithmic transparency requirements, and content liability —
+      or do free speech concerns and innovation risks make heavy regulation worse
+      than the disease?
+
+  - id: open_source_ai
+    title: "Open-Source AI Models: Democratisation or Dangerous Proliferation?"
+    description: >
+      Does releasing powerful AI model weights publicly accelerate beneficial
+      innovation and reduce corporate monopoly — or does it lower the barrier for
+      malicious actors to deploy AI for cyberattacks, disinformation, and bioweapons?
+
+  - id: surveillance_capitalism
+    title: "Surveillance Capitalism: Business Model or Societal Threat?"
+    description: >
+      Is the data-extraction model underlying Google, Meta, and similar platforms
+      a reasonable trade-off that funds free services — or is it a fundamentally
+      exploitative system that degrades privacy, democracy, and mental health?
+
+  - id: crypto_decentralisation
+    title: "Cryptocurrency: Financial Revolution or Speculative Bubble?"
+    description: >
+      Does blockchain-based currency and decentralised finance represent a genuine
+      structural alternative to centralised financial systems — or is the crypto
+      ecosystem primarily a speculative asset class with minimal real-world utility
+      and significant environmental costs?

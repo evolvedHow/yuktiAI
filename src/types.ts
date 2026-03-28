@@ -14,12 +14,18 @@ export interface TopicFileEntry {
   label: string;
 }
 
+/** Per-agent config block inside a .yml topic file */
+export interface AgentTopicConfig extends Partial<AgentDisplayMeta> {
+  /** Extra instructions appended to the agent's base persona for this topic set. */
+  persona_overlay?: string;
+}
+
 /** Parsed content of a .yml topic file */
 export interface TopicFileContent {
   agents?: {
-    moderator?: Partial<AgentDisplayMeta>;
-    advocate?: Partial<AgentDisplayMeta>;
-    critic?: Partial<AgentDisplayMeta>;
+    moderator?: AgentTopicConfig;
+    advocate?: AgentTopicConfig;
+    critic?: AgentTopicConfig;
   };
   topics: Topic[];
 }
@@ -39,6 +45,8 @@ export type DebateStatus = "idle" | "active" | "concluding" | "done";
 export interface AgentDisplayMeta {
   name: string;
   initial: string;
+  /** Short personality descriptor shown in the UI, e.g. "Witty & Playful" */
+  trait?: string;
 }
 export type AgentNames = Record<AgentId, AgentDisplayMeta>;
 

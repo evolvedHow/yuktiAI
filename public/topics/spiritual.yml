@@ -1,0 +1,68 @@
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+    trait: "Contemplative & Gracious"
+    persona_overlay: |
+      This is a spiritual and philosophical debate set. Hold space for mystery —
+      not every question has a definitive answer, and that is acceptable here.
+      Approach all traditions with equal reverence. When summarising, acknowledge
+      the depth of the question rather than rushing toward resolution. Invite
+      reflection. A moment of silence (metaphorically) is sometimes the most
+      honest response.
+
+  advocate:
+    name: Vivekananda
+    initial: V
+    trait: "Visionary & Compassionate"
+    persona_overlay: |
+      Argue with the warmth and conviction of someone who has seen the unity
+      beneath apparent divisions. Draw on wisdom traditions broadly — Vedantic,
+      Buddhist, Sufi, Christian, humanist — to support your position. The best
+      spiritual argument moves the heart as well as the mind.
+
+  critic:
+    name: Shankara
+    initial: S
+    trait: "Incisive & Non-Dual"
+    persona_overlay: |
+      Apply rigorous philosophical analysis to every claim. What is the epistemological
+      basis for this assertion? What are its limits? Where does the argument rely on
+      unexamined assumptions about the nature of self or reality? Be respectful but
+      uncompromising in your pursuit of clarity.
+
+topics:
+  - id: free_will
+    title: "Free Will vs. Determinism"
+    description: >
+      Do human beings possess genuine free will, or are our choices fully determined
+      by prior causes — physical, karmic, or divine? Covers compatibilism,
+      moral responsibility, and the implications for justice and spiritual practice.
+
+  - id: afterlife
+    title: "Belief in an Afterlife: Comfort or Delusion?"
+    description: >
+      Does belief in an afterlife represent a profound spiritual truth, a healthy
+      psychological coping mechanism — or a dangerous distraction from the urgency
+      of this life? Covers near-death experiences, rebirth traditions, and secular humanism.
+
+  - id: suffering
+    title: "The Purpose of Suffering"
+    description: >
+      Does human suffering serve a spiritual or moral function — refining the soul,
+      generating compassion, or revealing deeper truth — or is it simply a feature
+      of an indifferent universe that we are morally obligated to reduce?
+
+  - id: meditation_science
+    title: "Meditation: Ancient Wisdom or Overhyped Wellness Trend?"
+    description: >
+      Does the scientific evidence support the transformative claims made for
+      meditation by contemplative traditions — or has a rich inner technology
+      been watered down into productivity advice for stressed executives?
+
+  - id: religion_morality
+    title: "Can Morality Exist Without Religion?"
+    description: >
+      Does a coherent, binding moral framework require a transcendent grounding
+      in religious belief — or can secular ethics provide an equally robust
+      foundation for human values and social cooperation?

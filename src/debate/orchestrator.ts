@@ -207,19 +207,8 @@ export async function runDebate(
 }
 
 // ── Persona loader ────────────────────────────────────────────────────────────
-
-// ── Frontmatter parser ────────────────────────────────────────────────────────
-
-function parseFrontmatter(raw: string): { meta: Record<string, string>; body: string } {
-  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) return { meta: {}, body: raw };
-  const meta: Record<string, string> = {};
-  for (const line of match[1].split(/\r?\n/)) {
-    const colon = line.indexOf(":");
-    if (colon > 0) meta[line.slice(0, colon).trim()] = line.slice(colon + 1).trim();
-  }
-  return { meta, body: match[2] };
-}
+// Agent names are defined solely in the topics .yml files.
+// The .md files contain only the system-prompt body — no frontmatter.
 
 export async function loadPersonas(
   basePath: string,
@@ -229,23 +218,17 @@ export async function loadPersonas(
     agents.map(async (id) => {
       const res = await fetch(`${basePath}/agents/${id}.md`);
       if (!res.ok) throw new Error(`Could not load persona: ${id}.md`);
-      const { meta, body } = parseFrontmatter(await res.text());
-      return { id, body, meta };
+      return { id, body: await res.text() };
     }),
   );
 
   const personas: Partial<Record<AgentId, string>> = {};
-  const agentNames: Partial<AgentNames> = {};
-  for (const { id, body, meta } of results) {
+  for (const { id, body } of results) {
     personas[id] = body;
-    agentNames[id] = {
-      name:    meta["name"]    ?? (id.charAt(0).toUpperCase() + id.slice(1)),
-      initial: meta["initial"] ?? id.charAt(0).toUpperCase(),
-    };
   }
 
   return {
     personas: personas as Record<AgentId, string>,
-    agentNames: { ...DEFAULT_AGENT_NAMES, ...agentNames } as AgentNames,
+    agentNames: { ...DEFAULT_AGENT_NAMES },
   };
 }

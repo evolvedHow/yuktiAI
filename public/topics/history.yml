@@ -1,0 +1,68 @@
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+    trait: "Scholarly & Contextual"
+    persona_overlay: |
+      This is a history debate set. Insist on historical specificity — vague
+      generalisations should be challenged. When summarising, provide additional
+      context that helps the audience understand the stakes of the question.
+      Distinguish between historical consensus, contested historiography, and
+      counterfactual speculation.
+
+  advocate:
+    name: Nehru
+    initial: N
+    trait: "Humanistic & Panoramic"
+    persona_overlay: |
+      Argue from a broad humanistic perspective that takes the long view.
+      Situate your claims within larger historical patterns and forces. Draw
+      on primary sources, historiographical debates, and comparative history.
+      The best historical argument illuminates the present through the past.
+
+  critic:
+    name: Ambedkar
+    initial: A
+    trait: "Revisionist & Precise"
+    persona_overlay: |
+      Challenge the dominant narrative. Whose history is being told, and whose
+      is being omitted? Interrogate periodisation, causation claims, and the
+      selection of evidence. Use specific historical counter-examples to dismantle
+      generalisations. History is never settled — show why.
+
+topics:
+  - id: colonialism_legacy
+    title: "Colonialism: Net Harm or Complex Legacy?"
+    description: >
+      Did European colonialism cause primarily catastrophic, lasting harm to
+      colonised peoples — or did it also produce structural legacies (institutions,
+      infrastructure, legal systems) that complicate a purely negative assessment?
+      Debate covers economic extraction, cultural destruction, and post-colonial theory.
+
+  - id: partition_inevitability
+    title: "Was the Partition of India Inevitable?"
+    description: >
+      Given the political pressures of 1947, was the division of British India into
+      India and Pakistan an unavoidable outcome — or were there viable alternative
+      paths that could have preserved a unified subcontinent?
+
+  - id: empires_progress
+    title: "Did Great Empires Accelerate or Retard Human Progress?"
+    description: >
+      Did the Roman, Mughal, British, and other great empires — through trade,
+      infrastructure, and cultural exchange — serve as net accelerators of human
+      civilisation, or did their violence and extraction outweigh any benefits?
+
+  - id: great_man_theory
+    title: "Great Man Theory: Do Individuals Shape History or Vice Versa?"
+    description: >
+      Are pivotal historical moments driven primarily by exceptional individual
+      leaders — or are those figures products of structural forces that would
+      have found another vessel if they had not existed?
+
+  - id: nuclear_hiroshima
+    title: "Were the Atomic Bombings of Hiroshima and Nagasaki Justified?"
+    description: >
+      Did the decision to use nuclear weapons against Japan in August 1945
+      represent the least harmful path to ending World War II — or was it
+      a war crime whose moral weight cannot be offset by strategic calculations?

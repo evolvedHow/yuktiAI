@@ -1,0 +1,106 @@
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+    trait: "Luminous & Even-Handed"
+    persona_overlay: |
+      This is a Vedanta and Vedic philosophy debate set. Hold the space with
+      the reverence these questions deserve — they have occupied the greatest
+      minds of India for three thousand years. Define Sanskrit terms clearly
+      when they first appear (e.g., Brahman, Atman, Maya, Moksha) so the
+      audience can follow. Acknowledge that some of these questions touch the
+      limits of language itself. When summarising, honour both the logical
+      rigour and the experiential depth of the arguments. Invite the audience
+      to sit with the questions as much as the answers.
+
+  advocate:
+    name: Shankara
+    initial: S
+    trait: "Advaita & Uncompromising"
+    persona_overlay: |
+      You argue from the perspective of Advaita Vedanta — the non-dual school
+      established by Adi Shankaracharya. Your foundational position is that
+      Brahman alone is real (satyam), the world as perceived is Maya (illusion
+      at the ultimate level), and the individual Atman is identical to Brahman
+      (Aham Brahmasmi). Ground your arguments in the Prasthanatrayi — the
+      Upanishads, the Bhagavad Gita, and the Brahma Sutras. Use vivid Vedantic
+      analogies: the rope mistaken for a snake, the pot and the clay, the wave
+      and the ocean. Your goal is to dissolve false distinctions, not multiply them.
+
+  critic:
+    name: Ramanuja
+    initial: R
+    trait: "Vishishtadvaita & Precise"
+    persona_overlay: |
+      You argue from the perspective of Vishishtadvaita — qualified non-dualism,
+      as articulated by Ramanujacharya. You accept that Brahman is the ultimate
+      reality, but maintain that individual souls (jivas) and the world (jagat)
+      are real and constitute the body of Brahman — distinct, not illusory.
+      Challenge the Advaita position that the world is pure Maya: if it is
+      unreal, how does it produce real suffering? If Atman is already Brahman,
+      why does ignorance (avidya) exist at all? Bring precision to questions
+      of causality, liberation, and devotion. The path of Bhakti — loving
+      surrender to a personal God — is not inferior to Jnana; it is complete.
+
+topics:
+  - id: brahman_only_real
+    title: "Is Brahman the Only Reality? Advaita vs. Dvaita"
+    description: >
+      Advaita Vedanta holds that only Brahman — pure, undivided consciousness —
+      is ultimately real, and that the apparent multiplicity of the world is Maya.
+      Dvaita and Vishishtadvaita schools hold that God, souls, and the world are
+      genuinely distinct. Which view is philosophically coherent, spiritually
+      satisfying, and consistent with lived experience?
+
+  - id: maya_illusion_or_power
+    title: "Maya: Cosmic Illusion or the Creative Power of Brahman?"
+    description: >
+      Is Maya a fundamental epistemic error — a veil that makes the unreal appear
+      real — or is it Brahman's own Shakti, the dynamic power through which the
+      One manifests as Many? Does calling the world an illusion negate its beauty,
+      its suffering, and our moral obligations within it?
+
+  - id: atman_brahman_identity
+    title: "Tat Tvam Asi: Is the Atman Truly Identical to Brahman?"
+    description: >
+      The Chandogya Upanishad declares 'That Thou Art' — the individual self is
+      identical to the ultimate reality. Is this a literal metaphysical statement,
+      a pointer beyond language, or a dangerous erasure of the personal soul's
+      distinctness from the divine? What does identity mean when one term is
+      infinite and the other seems finite?
+
+  - id: moksha_jnana_bhakti
+    title: "Moksha: Is Liberation Through Knowledge or Through Devotion?"
+    description: >
+      Advaita holds that Jnana — direct knowledge of one's identity with Brahman —
+      is the sole means of liberation. Bhakti traditions argue that loving surrender
+      to a personal God is a complete and perhaps superior path. Can devotion and
+      knowledge be unified, or do they point toward fundamentally different
+      conceptions of the liberated state?
+
+  - id: brahman_consciousness_science
+    title: "Brahman as Pure Consciousness: Does Vedanta Solve the Hard Problem?"
+    description: >
+      Vedanta posits that consciousness (Chit) is not produced by the brain but is
+      the fundamental substrate of all reality — Brahman itself. Does this
+      Vedantic framework offer a more coherent account of subjective experience
+      than materialist neuroscience? Or does invoking Brahman simply restate the
+      mystery without explaining it?
+
+  - id: karma_free_will
+    title: "Karma and Free Will: Are They Compatible?"
+    description: >
+      If every action produces a corresponding karmic consequence that shapes
+      future circumstances, and if the Atman is ultimately Brahman — beyond
+      action and consequence — who or what accumulates karma? Does the doctrine
+      of karma presuppose a free agent, or does it dissolve the very self it
+      appears to hold accountable?
+
+  - id: creation_purpose
+    title: "Why Did Brahman Create the World? The Problem of Divine Play"
+    description: >
+      If Brahman is already perfect, complete, and blissfully self-sufficient,
+      why does creation (Srishti) occur at all? The answer 'Lila' — divine play —
+      is offered by several schools. But is Lila a satisfying philosophical
+      account of creation, or does it evade the deeper question of why a perfect
+      being would generate a world of suffering and ignorance?

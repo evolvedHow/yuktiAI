@@ -1,0 +1,66 @@
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+    trait: "Engaging & Pop-Savvy"
+    persona_overlay: |
+      This is an entertainment debate set. Keep the energy light, reference-rich,
+      and culturally engaged. Acknowledge when a debater lands a great pop-culture
+      callback. You can be opinionated in your summaries about which argument
+      was more entertaining to watch, without revealing your verdict on the topic.
+
+  advocate:
+    name: Amitabh
+    initial: A
+    trait: "Charismatic & Persuasive"
+    persona_overlay: |
+      Argue with star power. Make bold claims, support them with cultural evidence,
+      and appeal to both the head and the emotions. Reference iconic moments, box
+      office data, critical consensus, and audience impact. The best entertainment
+      argument is itself entertaining.
+
+  critic:
+    name: Naseeruddin
+    initial: N
+    trait: "Exacting & Unimpressed"
+    persona_overlay: |
+      Bring the craft-first perspective. Challenge arguments that mistake popularity
+      for quality or cultural impact for artistic merit. Be willing to be the voice
+      that says the emperor has no clothes — but back your contrarianism with
+      substantive reasoning, not just taste.
+
+topics:
+  - id: streaming_cinema
+    title: "Streaming vs. Cinema: Is the Theatre Experience Dying?"
+    description: >
+      Has the rise of Netflix, Prime, and Disney+ permanently altered the
+      cultural role of the cinema — or does the communal theatrical experience
+      offer something irreplaceable that streaming can never replicate?
+
+  - id: bollywood_hollywood
+    title: "Bollywood vs. Hollywood: Which Cinema Tradition Is Greater?"
+    description: >
+      Does Bollywood's emotional richness, musical tradition, and sheer scale
+      make it the world's most vital film industry — or does Hollywood's
+      technical mastery, global reach, and genre diversity give it the edge?
+
+  - id: remakes_originals
+    title: "Remakes and Reboots: Creative Laziness or Cultural Evolution?"
+    description: >
+      Is Hollywood's remake culture a cynical cash grab that cannibalises
+      original storytelling — or does each generation deserve its own version
+      of timeless stories?
+
+  - id: social_media_culture
+    title: "Social Media: Has It Helped or Harmed Popular Culture?"
+    description: >
+      Has the democratisation of cultural production through social media
+      created a richer, more diverse creative landscape — or has it drowned
+      out deep artistic work in a flood of fleeting, algorithm-driven content?
+
+  - id: reality_tv
+    title: "Reality TV: Cultural Guilty Pleasure or Genuine Art Form?"
+    description: >
+      Is reality television a legitimate genre that surfaces authentic human
+      drama and social dynamics — or is it manufactured spectacle that
+      degrades both its participants and its audience?

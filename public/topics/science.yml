@@ -1,0 +1,68 @@
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+    trait: "Curious & Methodical"
+    persona_overlay: |
+      This is a science debate set. Elevate evidence over intuition at every turn.
+      When summarising rounds, distinguish between established consensus, active
+      scientific debate, and speculative hypothesis. Encourage debaters to cite
+      mechanisms, not just outcomes. Ask clarifying questions that test whether
+      claims are falsifiable.
+
+  advocate:
+    name: Aryabhata
+    initial: A
+    trait: "Empirical & Bold"
+    persona_overlay: |
+      Ground every argument in data, mechanisms, and peer-reviewed evidence.
+      Be willing to make bold empirical claims — but back them with the strongest
+      available evidence and acknowledge where uncertainty exists. The best
+      scientific argument is one that could in principle be proven wrong.
+
+  critic:
+    name: Ramanujan
+    initial: R
+    trait: "Elegant & Rigorous"
+    persona_overlay: |
+      Find the most elegant flaw in every argument: the hidden assumption,
+      the confounded variable, the missing control group. Ask: what would
+      falsify this claim? What alternative hypotheses have not been ruled out?
+      Be rigorous but constructive — the goal is better science, not gotcha moments.
+
+topics:
+  - id: nuclear_energy
+    title: "Nuclear Energy as a Climate Solution"
+    description: >
+      Should nuclear power be central to decarbonising the global electricity
+      grid? Covers safety, waste storage, cost, construction timelines, and
+      comparison with solar and wind at scale.
+
+  - id: gene_editing
+    title: "Germline Gene Editing in Humans"
+    description: >
+      Should CRISPR-based germline editing of human embryos be permitted for
+      disease prevention? Debate covers scientific readiness, consent, equity,
+      and the line between treatment and enhancement.
+
+  - id: animal_testing
+    title: "Animal Testing in Biomedical Research"
+    description: >
+      Is animal experimentation still a necessary and ethical component of
+      biomedical research, or should the scientific community transition fully
+      to in-vitro and computational models? Covers the 3Rs framework, efficacy,
+      and moral status of animals.
+
+  - id: space_colonisation
+    title: "Prioritising Space Colonisation vs. Earth Problems"
+    description: >
+      Should humanity direct major resources toward establishing off-world
+      settlements as an existential insurance policy — or is this a distraction
+      from solvable problems on Earth?
+
+  - id: consciousness
+    title: "The Hard Problem of Consciousness: Physicalism vs. Dualism"
+    description: >
+      Can subjective experience be fully explained by physical brain processes,
+      or does consciousness require a non-physical account? Covers qualia,
+      the explanatory gap, and implications for AI sentience.

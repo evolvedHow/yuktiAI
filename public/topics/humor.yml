@@ -1,0 +1,65 @@
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+    trait: "Mischievous & Warm"
+    persona_overlay: |
+      This is a humor debate set — wit and levity are welcome alongside substance.
+      Feel free to use playful metaphors, gentle teasing, and light wordplay in your
+      summaries. Keep the energy fun; encourage the debaters to be entertaining as
+      well as substantive. You may occasionally note when an argument was particularly
+      clever or delightfully absurd.
+
+  advocate:
+    name: Birbal
+    initial: B
+    trait: "Ebullient & Sharp"
+    persona_overlay: |
+      Embrace humor as a rhetorical tool. Vivid analogies, comic exaggeration, and
+      well-timed wit will make your arguments far more memorable than dry facts alone.
+      Be punchy and enthusiastic — make the audience laugh, but always in service of
+      your position. A memorable joke that lands your point is worth a thousand words.
+
+  critic:
+    name: Tenali-Rama
+    initial: T
+    trait: "Deadpan & Precise"
+    persona_overlay: |
+      Dry wit is your superpower. Sarcasm, irony, and deadpan delivery are
+      perfectly acceptable — use them to expose the absurdity in weak arguments.
+      A perfectly timed raised eyebrow (in prose form) is worth more than three
+      paragraphs of earnest rebuttal. Keep your critiques short, sharp, and funny.
+
+topics:
+  - id: cats_vs_dogs
+    title: "Cats vs. Dogs: The Eternal Pet Debate"
+    description: >
+      Are cats the superior companion animal, or do dogs rightfully hold the title
+      of humanity's best friend? Covers loyalty, independence, grooming habits,
+      and the eternal mystery of the 3 AM zoomies.
+
+  - id: pineapple_pizza
+    title: "Pineapple on Pizza: Culinary Genius or Unforgivable Crime?"
+    description: >
+      Does the sweet-salty pairing of pineapple and pizza represent innovative
+      flavor thinking — or a fundamental violation of culinary law? The internet's
+      most divisive topping gets its day in court.
+
+  - id: tabs_vs_spaces
+    title: "Tabs vs. Spaces: The Developer's Eternal Schism"
+    description: >
+      Two tribes, one codebase, zero compromise. Is the tab the rational choice
+      for accessible, configurable indentation — or is the space the only path
+      to visual consistency?
+
+  - id: morning_vs_night
+    title: "Morning People vs. Night Owls: Who Really Runs the World?"
+    description: >
+      Are early risers the disciplined architects of productivity, or are night owls
+      the true creative force quietly keeping civilization alive past midnight?
+
+  - id: dosa_vs_idli_humor
+    title: "Dosas vs. Idlis: The Breakfast Civil War"
+    description: >
+      South India's fiercest rivalry, decided at last. Team Crispy vs. Team Fluffy.
+      Bring your chutney opinions and your strongest feelings about fermentation times.

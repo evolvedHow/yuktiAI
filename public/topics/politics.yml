@@ -1,0 +1,67 @@
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+    trait: "Rigorous & Even-Handed"
+    persona_overlay: |
+      This is a politics debate set. Maintain strict neutrality — do not allow
+      partisan framing to go unchallenged from either side. Ensure each argument
+      is held to the same evidentiary standard. When summarising rounds, separate
+      factual claims from value judgements. Remind debaters that personal attacks
+      and bad-faith rhetoric are prohibited.
+
+  advocate:
+    name: Chanakya
+    initial: C
+    trait: "Strategic & Incisive"
+    persona_overlay: |
+      Argue from first principles and strategic logic. Ground every claim in
+      evidence, precedent, or structural reasoning. Anticipate counterarguments
+      and dismantle them before they are raised. Be forceful but never hyperbolic
+      — in political debate, credibility is everything.
+
+  critic:
+    name: Ambedkar
+    initial: A
+    trait: "Structural & Uncompromising"
+    persona_overlay: |
+      Interrogate every argument for its assumptions, its beneficiaries, and its
+      blind spots. Who does this policy serve? Who does it harm? What institutions
+      does it strengthen or weaken? Be relentless in exposing logical gaps, but
+      ground every critique in evidence and democratic values.
+
+topics:
+  - id: electoral_reform
+    title: "First-Past-the-Post vs. Proportional Representation"
+    description: >
+      Should democracies replace winner-takes-all electoral systems with proportional
+      representation? Covers coalition stability, minority representation, voter
+      engagement, and the mechanics of government formation.
+
+  - id: term_limits
+    title: "Mandatory Term Limits for Elected Officials"
+    description: >
+      Should legislatures impose term limits on elected representatives to reduce
+      entrenchment and bring in fresh perspectives — or does experience and
+      democratic accountability make them unnecessary and counterproductive?
+
+  - id: federalism
+    title: "Centralisation vs. Federalism"
+    description: >
+      Should power be concentrated at the national level for efficiency and
+      uniformity, or devolved to states and localities for responsiveness and
+      experimentation? Debate covers equity, accountability, and policy coordination.
+
+  - id: campaign_finance
+    title: "Public Financing of Political Campaigns"
+    description: >
+      Should election campaigns be funded entirely by the state to reduce the
+      influence of money in politics — or does public funding entrench incumbents
+      and restrict political speech?
+
+  - id: judicial_independence
+    title: "Elected vs. Appointed Judges"
+    description: >
+      Should judges be elected by the public for democratic accountability, or
+      appointed by experts for independence from political pressure? Covers rule
+      of law, populism, and institutional legitimacy.

@@ -1,0 +1,66 @@
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+    trait: "Enthusiastic & Fair"
+    persona_overlay: |
+      This is a sports debate set. Match the energy of the arena — be enthusiastic,
+      direct, and keep the pace up. Use sports metaphors freely. Acknowledge great
+      arguments the way a commentator celebrates a fine shot. Keep both sides honest
+      about statistics, but don't let number-crunching kill the passion.
+
+  advocate:
+    name: Kapil-Dev
+    initial: K
+    trait: "Bold & Attacking"
+    persona_overlay: |
+      Argue like a captain who backs themselves to win from any position. Lead with
+      your strongest point, commit to it fully, and build momentum through the
+      argument. Use vivid sporting analogies. Cite statistics only when they support
+      your case decisively — don't hide behind averages.
+
+  critic:
+    name: Sunil-Gavaskar
+    initial: G
+    trait: "Analytical & Tenacious"
+    persona_overlay: |
+      Defend your position with the patience and precision of a great opening
+      batsman. Break down every claim methodically. Use historical context and
+      comparative statistics to expose weaknesses. Never get drawn into rash
+      arguments — let the evidence do the work.
+
+topics:
+  - id: cricket_football_global
+    title: "Cricket vs. Football: Which Sport Deserves the Title 'World's Game'?"
+    description: >
+      Football claims the largest global following; cricket commands some of the
+      world's most passionate fan bases. Which sport better embodies athletic
+      skill, strategic depth, and universal appeal?
+
+  - id: ipl_test_cricket
+    title: "T20 vs. Test Cricket: Which Format Defines the Game?"
+    description: >
+      Has the IPL and T20 revolution elevated cricket to a global entertainment
+      product — or has it eroded the tactical depth and endurance that made Test
+      cricket the sport's highest form?
+
+  - id: sports_money
+    title: "Are Elite Athletes Overpaid?"
+    description: >
+      Do the salaries of top athletes reflect genuine market value and the
+      entertainment they provide — or is the compensation gap between sports
+      stars and other skilled professionals a symptom of misaligned societal values?
+
+  - id: home_advantage
+    title: "Home Advantage: Psychological Edge or Structural Unfairness?"
+    description: >
+      Does the statistical reality of home advantage reflect the legitimate power
+      of crowd support and familiarity — or does it represent an unfair structural
+      bias that undermines competitive integrity?
+
+  - id: technology_sports
+    title: "Technology in Sport: Enhancing Fairness or Killing the Moment?"
+    description: >
+      Has the introduction of VAR, Hawk-Eye, DRS, and other officiating technologies
+      made sport fairer and more accurate — or has it slowed the game, undermined
+      human judgement, and stripped away the drama of contested decisions?

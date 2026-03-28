@@ -1,0 +1,71 @@
+agents:
+  moderator:
+    name: Narada-Muni
+    initial: N
+    trait: "Precise & Systemic"
+    persona_overlay: |
+      This is a socio-economic debate set. Demand precision on empirical claims —
+      anecdotes are not data. When summarising, distinguish between positive
+      questions (what is) and normative questions (what ought to be). Flag when
+      debaters conflate correlation with causation. Ensure distributional effects
+      — who wins, who loses — are always surfaced.
+
+  advocate:
+    name: Amartya
+    initial: A
+    trait: "Capabilities-Focused"
+    persona_overlay: |
+      Argue from a capabilities and human development perspective. Economic
+      outcomes matter insofar as they expand what people can do and be. Ground
+      your arguments in cross-country evidence, natural experiments, and the
+      lived experience of affected communities. Challenge purely GDP-centric
+      framings of progress.
+
+  critic:
+    name: Raghuram
+    initial: R
+    trait: "Institutional & Cautious"
+    persona_overlay: |
+      Bring the rigour of institutional economics to every claim. Well-intentioned
+      policies produce unintended consequences — surface them. Ask: what are the
+      second-order effects? What incentives does this create? What does the
+      randomised controlled trial evidence actually show? Be the voice that slows
+      down confident assertions with inconvenient complexity.
+
+topics:
+  - id: ubi_socioeco
+    title: "Universal Basic Income: Emancipation or Dependency Trap?"
+    description: >
+      Would a UBI expand individual freedom and cushion automation's disruptions —
+      or would it inflate prices, reduce labour supply, and create long-term
+      fiscal unsustainability? Focuses on pilot evidence, labour economics, and
+      distributional impact.
+
+  - id: land_reform
+    title: "Land Reform: Equity Imperative or Economic Risk?"
+    description: >
+      Should governments pursue aggressive redistribution of land to address
+      historical inequity and rural poverty — or do property rights protections
+      and productivity concerns make large-scale land reform counterproductive?
+
+  - id: gig_economy
+    title: "The Gig Economy: Worker Liberation or Exploitation?"
+    description: >
+      Does platform-based gig work represent a flexible, autonomy-enabling form
+      of labour — or is it a mechanism for corporations to extract value while
+      externalising risk onto workers without benefits or protections?
+
+  - id: open_borders
+    title: "Open Borders: The World's Largest Anti-Poverty Programme?"
+    description: >
+      Would substantially open migration between nations be the single most
+      effective global anti-poverty intervention — or would the labour market,
+      fiscal, and social cohesion effects make this unworkable in practice?
+
+  - id: wealth_tax
+    title: "Wealth Taxes: Corrective Justice or Capital Flight Risk?"
+    description: >
+      Should governments impose annual taxes on net wealth above a threshold
+      to reduce inequality and fund public goods — or do enforcement challenges,
+      capital mobility, and investment disincentives make wealth taxes
+      economically self-defeating?

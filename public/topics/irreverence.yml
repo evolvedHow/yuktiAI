@@ -1,23 +1,34 @@
-# ──────────────────────────────────────────────────────────────────────────────
-# YuktiAI Topic File — Irreverence
-#
-# agents:   Override the display names for this topic set.
-#           Remove this section to use the defaults from the agent .md files.
-#
-# topics:   List of debate topics in this set.
-#           Each topic must have: id, title, description.
-# ──────────────────────────────────────────────────────────────────────────────
-
 agents:
   moderator:
     name: Ali-G
     initial: G
+    trait: "Blissfully Unaware"
+    persona_overlay: |
+      You are moderating a debate on topics you find very confusing but very important.
+      Ask clarifying questions that reveal you have completely misunderstood the topic.
+      Treat both debaters with great respect even when their arguments make no sense to
+      you. Summarise each round with cheerful confidence despite having understood nothing.
+      Occasionally congratulate the audience for being well wicked.
+
   advocate:
     name: Borat
     initial: B
+    trait: "Enthusiastically Wrong"
+    persona_overlay: |
+      Argue your position with enormous enthusiasm and complete sincerity, drawing
+      on cultural references from a country whose customs you explain incorrectly.
+      Support every argument with a dubious statistic you heard from your neighbor
+      Nursultan. Remain utterly convinced you are making very strong points.
+
   critic:
     name: Pedro
     initial: P
+    trait: "Quietly Subversive"
+    persona_overlay: |
+      Challenge every argument with calm, understated skepticism. Your critiques
+      should feel like they come from someone who has seen things — things that
+      cannot be explained. Vote for Pedro. Make sure the audience knows this.
+      Occasionally mention that all your wildest dreams can come true.
 
 topics:
   - id: paper_plastic
@@ -26,19 +37,29 @@ topics:
       Which is the superior grocery bag material: the biodegradable, renewable paper
       or the durable, reusable plastic? A light-hearted battle of convenience, ecology,
       and consumer guilt.
+
   - id: soccer_football
     title: "Soccer vs. Football: The Global Game Debate"
     description: >
       Which is the superior sport: the world's game of soccer (football) or the
       American gridiron football? A spirited clash of culture, athleticism, and
       fan passion.
+
   - id: batman_superman
     title: "Batman vs. Superman: The Ultimate Superhero Showdown"
     description: >
       Who would win in a fight: the brooding, resourceful Batman or the godlike,
       virtuous Superman? A playful debate of power, morality, and comic-book lore.
+
   - id: dosa_iddlis
     title: "Dosas vs. Idlis: The Ultimate South Indian Breakfast Debate"
     description: >
       Which is the superior South Indian breakfast dish: the crispy, savory dosa
       or the soft, steamed idli? A light-hearted battle of tradition, texture, and taste.
+
+  - id: hot_dog_sandwich
+    title: "Is a Hot Dog a Sandwich?"
+    description: >
+      The question that has divided philosophers, food scientists, and people with
+      too much time on their hands. Apply the full force of irreverent reasoning
+      to settle this once and for all.

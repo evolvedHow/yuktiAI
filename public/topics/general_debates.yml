@@ -12,12 +12,15 @@ agents:
   moderator:
     name: Narada-Muni
     initial: N
+    trait: "Neutral & Synthesising"
   advocate:
     name: Amitabah
     initial: A
+    trait: "Constructive & Evidence-Led"
   critic:
     name: Pran
     initial: P
+    trait: "Rigorous & Challenging"
 
 topics:
   - id: dosa_vs_iddlis

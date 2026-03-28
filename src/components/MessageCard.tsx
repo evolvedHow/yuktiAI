@@ -50,7 +50,7 @@ interface Props {
 
 export function MessageCard({ message, agentNames }: Props) {
   const style = AGENT_STYLE[message.agent];
-  const { name, initial } = agentNames[message.agent];
+  const { name, initial, trait } = agentNames[message.agent];
   // "Narada-Muni · Moderator" — omit role suffix for audience
   const label = message.agent === "audience"
     ? "Audience Question"
@@ -97,6 +97,11 @@ export function MessageCard({ message, agentNames }: Props) {
           {initial}
         </span>
         <span className={`text-sm font-medium ${style.labelCls}`}>{label}</span>
+        {trait && (
+          <span className={`text-[10px] italic px-1.5 py-0.5 rounded-full border ${style.cardCls} ${style.labelCls} opacity-70`}>
+            {trait}
+          </span>
+        )}
         <span className="text-[10px] text-muted ml-auto">{ts}</span>
       </div>
 

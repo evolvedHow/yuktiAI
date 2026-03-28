@@ -53,8 +53,9 @@ export function useDebate() {
     delayMs: 0,
   });
 
-  // Personas loaded once at mount (names from .md frontmatter)
+  // Personas loaded once at mount (raw .md bodies, never mutated after load)
   const personasRef = useRef<Record<AgentId, string> | null>(null);
+  const basePersonasRef = useRef<Record<AgentId, string> | null>(null);
   // Base agent names derived from persona .md files
   const baseAgentNamesRef = useRef<AgentNames>(DEFAULT_AGENT_NAMES);
 
@@ -83,24 +84,39 @@ export function useDebate() {
 
       setTopics(parsed.topics);
 
-      // Merge agent name overrides from the yml file on top of base persona names
-      if (parsed.agents) {
-        const overrides = parsed.agents;
-        setAgentNames((prev) => ({
-          ...prev,
-          moderator: overrides.moderator
-            ? { ...baseAgentNamesRef.current.moderator, ...overrides.moderator }
-            : baseAgentNamesRef.current.moderator,
-          advocate: overrides.advocate
-            ? { ...baseAgentNamesRef.current.advocate, ...overrides.advocate }
-            : baseAgentNamesRef.current.advocate,
-          critic: overrides.critic
-            ? { ...baseAgentNamesRef.current.critic, ...overrides.critic }
-            : baseAgentNamesRef.current.critic,
-        }));
-      } else {
-        setAgentNames(baseAgentNamesRef.current);
+      const agentIds: AgentId[] = ["moderator", "advocate", "critic"];
+
+      // Apply persona_overlay: append to base persona body for each agent
+      if (basePersonasRef.current) {
+        const effective = { ...basePersonasRef.current } as Record<AgentId, string>;
+        for (const id of agentIds) {
+          const overlay = parsed.agents?.[id as "moderator" | "advocate" | "critic"]?.persona_overlay;
+          if (overlay) {
+            effective[id] = `${basePersonasRef.current[id].trimEnd()}\n\n---\n\n${overlay.trim()}`;
+          }
+        }
+        personasRef.current = effective;
       }
+
+      // Merge name, initial, and trait overrides from the yml file
+      const overrides = parsed.agents ?? {};
+      setAgentNames(() => {
+        const base = baseAgentNamesRef.current;
+        const merged = { ...base };
+        for (const id of agentIds) {
+          const ov = overrides[id as "moderator" | "advocate" | "critic"];
+          if (ov) {
+            merged[id as AgentId] = {
+              name:    ov.name    ?? base[id as AgentId].name,
+              initial: ov.initial ?? base[id as AgentId].initial,
+              trait:   ov.trait,
+            };
+          } else {
+            merged[id as AgentId] = { ...base[id as AgentId], trait: undefined };
+          }
+        }
+        return merged;
+      });
     } catch (err) {
       setError(`Failed to load topic file "${entry.file}": ${(err as Error).message}`);
     }
@@ -126,6 +142,7 @@ export function useDebate() {
     loadPersonas(base)
       .then(({ personas, agentNames: names }) => {
         personasRef.current = personas;
+        basePersonasRef.current = personas;
         baseAgentNamesRef.current = names;
         // Will be overridden if a topic file has agent overrides, but set base now
         setAgentNames(names);
