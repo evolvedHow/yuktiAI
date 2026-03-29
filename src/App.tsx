@@ -25,6 +25,7 @@ export default function App() {
     advanceTurn,
     pauseGate,
     resumeGate,
+    backendStatus,
   } = useDebate();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -88,6 +89,7 @@ export default function App() {
       {settingsOpen && (
         <SettingsModal
           settings={settings}
+          backendStatus={backendStatus}
           onSave={updateSettings}
           onClose={() => setSettingsOpen(false)}
         />

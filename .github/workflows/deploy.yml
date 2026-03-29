@@ -36,6 +36,10 @@ jobs:
           VITE_MAX_TOKENS:      ${{ secrets.VITE_MAX_TOKENS }}
           VITE_TURN_DELAY_MS:   ${{ secrets.VITE_TURN_DELAY_MS }}
           VITE_MAX_TURNS:       ${{ secrets.VITE_MAX_TURNS }}
+          # Optional: set this secret to bake a backend URL into the Pages build
+          # so users don't need to configure it manually in their browser.
+          # Leave unset to ship in pure direct-to-provider mode.
+          VITE_BACKEND_URL:     ${{ secrets.VITE_BACKEND_URL }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

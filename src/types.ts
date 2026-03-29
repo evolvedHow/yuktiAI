@@ -77,6 +77,12 @@ export interface LLMSettings {
   maxTokensPerTurn: number;
   interTurnDelayMs: number;
   maxTurns: number;
+  /** Optional backend server URL (no trailing slash).
+   *  When set, all LLM calls are proxied through this server instead of going
+   *  directly to the provider. The API key is managed server-side.
+   *  Leave empty to use direct-to-provider mode (GitHub Pages compatible).
+   *  e.g. http://localhost:8080  or  https://my-yukti-backend.fly.dev */
+  backendUrl: string;
 }
 
 // Build-time env vars (VITE_* prefix required by Vite).
@@ -88,6 +94,7 @@ export const DEFAULT_SETTINGS: LLMSettings = {
   maxTokensPerTurn: Number(import.meta.env.VITE_MAX_TOKENS   ?? 420),
   interTurnDelayMs: Number(import.meta.env.VITE_TURN_DELAY_MS ?? 8000),
   maxTurns:         Number(import.meta.env.VITE_MAX_TURNS     ?? 14),
+  backendUrl:       import.meta.env.VITE_BACKEND_URL   ?? "",
 };
 
 export const PROVIDER_PRESETS: { label: string; baseUrl: string; placeholder: string }[] = [

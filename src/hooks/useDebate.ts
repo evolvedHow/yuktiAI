@@ -17,6 +17,8 @@ import {
 } from "../types";
 import { loadPersonas, runDebate } from "../debate/orchestrator";
 
+export type BackendStatus = "unknown" | "online" | "offline";
+
 const SETTINGS_KEY = "yuktiai_settings";
 
 function loadSettings(): LLMSettings {
@@ -52,6 +54,7 @@ export function useDebate() {
     paused: false,
     delayMs: 0,
   });
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>("unknown");
 
   // Personas loaded once at mount (raw .md bodies, never mutated after load)
   const personasRef = useRef<Record<AgentId, string> | null>(null);
@@ -150,6 +153,19 @@ export function useDebate() {
       .catch(() => setError("Failed to load agent personas"));
   }, [loadTopicFile]);
 
+  // ── Backend health check ─────────────────────────────────────────────────
+  useEffect(() => {
+    const url = settings.backendUrl.trim();
+    if (!url) {
+      setBackendStatus("unknown");
+      return;
+    }
+    setBackendStatus("unknown");
+    fetch(`${url}/health`, { signal: AbortSignal.timeout(4000) })
+      .then((r) => setBackendStatus(r.ok ? "online" : "offline"))
+      .catch(() => setBackendStatus("offline"));
+  }, [settings.backendUrl]);
+
   // ── Switch topic file ────────────────────────────────────────────────────
   const selectTopicFile = useCallback((file: string) => {
     const base = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -175,8 +191,9 @@ export function useDebate() {
       setError("Agent personas not loaded yet — please wait a moment and try again.");
       return;
     }
-    if (!settings.apiKey.trim()) {
-      setError("No API key — open Settings and enter your key.");
+    const usingBackend = Boolean(settings.backendUrl.trim());
+    if (!usingBackend && !settings.apiKey.trim()) {
+      setError("No API key — open Settings and enter your key, or configure a backend server.");
       return;
     }
 
@@ -255,8 +272,15 @@ export function useDebate() {
       onDone: () => setStatus("done"),
     };
 
+    // When a backend is configured, route all LLM calls through it.
+    // The backend exposes an OpenAI-compatible /v1/chat/completions endpoint
+    // and holds the API key server-side, so we don't need one in the browser.
+    const effectiveSettings = usingBackend
+      ? { ...settings, baseUrl: `${settings.backendUrl.trim()}/v1`, apiKey: "" }
+      : settings;
+
     try {
-      await runDebate(topic, personas, settings, callbacks, control);
+      await runDebate(topic, personas, effectiveSettings, callbacks, control);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         setError(`Debate error: ${(err as Error).message}`);
@@ -317,5 +341,6 @@ export function useDebate() {
     advanceTurn,
     pauseGate,
     resumeGate,
+    backendStatus,
   };
 }
