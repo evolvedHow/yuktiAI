@@ -97,12 +97,12 @@ function buildMessages(
 
   if (bootstrapPrompt) {
     messages.push({ role: "user", content: bootstrapPrompt });
-  } else if (history.length === 0) {
-    // Very first call — no history yet
-    messages.push({
-      role: "user",
-      content: "Please begin now.",
-    });
+  } else {
+    // Ensure every LLM call ends with a user message so the model knows
+    // to generate a response. Without this, agents beyond the first (especially
+    // the Critic) may produce empty output when the last history entry is
+    // another agent's statement rather than a direct prompt.
+    messages.push({ role: "user", content: "Please respond now." });
   }
 
   return messages;
