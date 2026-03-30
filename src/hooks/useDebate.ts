@@ -17,7 +17,9 @@ import {
 } from "../types";
 import { loadPersonas, runDebate } from "../debate/orchestrator";
 import {
+  DEFAULT_ENGLISH_STYLE,
   getSessionStyle,
+  loadStyles,
   setSessionStyle,
   setSessionModeratorApplies,
 } from "../debate/styles";
@@ -60,7 +62,8 @@ export function useDebate() {
     delayMs: 0,
   });
   const [backendStatus, setBackendStatus] = useState<BackendStatus>("unknown");
-  const [activeStyle, setActiveStyleState] = useState<DebateStyle>(() => getSessionStyle());
+  const [debateStyles, setDebateStyles] = useState<DebateStyle[]>([DEFAULT_ENGLISH_STYLE]);
+  const [activeStyle, setActiveStyleState] = useState<DebateStyle>(DEFAULT_ENGLISH_STYLE);
 
   // Personas loaded once at mount (raw .md bodies, never mutated after load)
   const personasRef = useRef<Record<AgentId, string> | null>(null);
@@ -162,6 +165,17 @@ export function useDebate() {
         setAgentNames(names);
       })
       .catch(() => setError("Failed to load agent personas"));
+
+    // Load debate styles from public/styles/index.json + .md files
+    loadStyles(base)
+      .then((styles) => {
+        setDebateStyles(styles);
+        // Initialise active style to the first entry (English by convention)
+        const first = styles[0];
+        setSessionStyle(first);
+        setActiveStyleState(first);
+      })
+      .catch(() => setError("Failed to load styles/index.json"));
   }, [loadTopicFile]);
 
   // ── Backend health check ─────────────────────────────────────────────────
@@ -359,6 +373,7 @@ export function useDebate() {
     pauseGate,
     resumeGate,
     backendStatus,
+    debateStyles,
     activeStyle,
     setActiveStyle,
   };

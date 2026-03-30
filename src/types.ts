@@ -37,6 +37,14 @@ export interface TopicFileContent {
 
 // ── Debate Style types ────────────────────────────────────────────────────────
 
+/** Entry in public/styles/index.json */
+export interface StyleIndexEntry {
+  id: string;
+  label: string;
+  /** Path to the .md file relative to the styles/ directory, or null for plain English. */
+  file: string | null;
+}
+
 export interface LanguageModule {
   id: string;
   label: string;

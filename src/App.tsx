@@ -26,6 +26,9 @@ export default function App() {
     pauseGate,
     resumeGate,
     backendStatus,
+    debateStyles,
+    activeStyle,
+    setActiveStyle,
   } = useDebate();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -54,6 +57,9 @@ export default function App() {
         onAsk={askQuestion}
         onConclude={requestConclusion}
         onOpenSettings={() => setSettingsOpen(true)}
+        debateStyles={debateStyles}
+        activeStyle={activeStyle}
+        onSelectStyle={setActiveStyle}
       />
 
       {/* Main content */}

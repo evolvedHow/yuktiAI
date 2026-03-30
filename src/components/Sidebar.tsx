@@ -9,7 +9,6 @@
 import { useState } from "react";
 import { DebateStatus, DebateStyle, Topic, TopicFileEntry } from "../types";
 import { AudienceControls } from "./AudienceControls";
-import { DEBATE_STYLES, setSessionStyle } from "../debate/styles";
 
 interface Props {
   topicFiles: TopicFileEntry[];
@@ -22,6 +21,9 @@ interface Props {
   onAsk: (question: string) => void;
   onConclude: () => void;
   onOpenSettings: () => void;
+  debateStyles: DebateStyle[];
+  activeStyle: DebateStyle;
+  onSelectStyle: (style: DebateStyle) => void;
 }
 
 export function Sidebar({
@@ -35,14 +37,11 @@ export function Sidebar({
   onAsk,
   onConclude,
   onOpenSettings,
+  debateStyles,
+  activeStyle,
+  onSelectStyle,
 }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [activeStyle, setActiveStyle] = useState<DebateStyle>(DEBATE_STYLES[0]);
-
-  function handleSelectStyle(style: DebateStyle) {
-    setSessionStyle(style);
-    setActiveStyle(style);
-  }
 
   const inner = (
     <div className="flex flex-col h-full">
@@ -86,10 +85,10 @@ export function Sidebar({
           Debate Style
         </p>
         <div className="flex rounded-lg border border-border overflow-hidden text-xs">
-          {DEBATE_STYLES.map((style, i) => (
+          {debateStyles.map((style, i) => (
             <button
               key={style.id}
-              onClick={() => handleSelectStyle(style)}
+              onClick={() => onSelectStyle(style)}
               className={[
                 "flex-1 py-1.5 px-2 transition-colors leading-none",
                 i > 0 ? "border-l border-border" : "",

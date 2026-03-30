@@ -1,0 +1,17 @@
+[
+  {
+    "id": "english",
+    "label": "English",
+    "file": null
+  },
+  {
+    "id": "hinglish",
+    "label": "Hinglish",
+    "file": "hinglish.md"
+  },
+  {
+    "id": "tanglish",
+    "label": "Tanglish",
+    "file": "tanglish.md"
+  }
+]
