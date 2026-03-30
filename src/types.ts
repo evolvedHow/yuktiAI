@@ -28,6 +28,45 @@ export interface TopicFileContent {
     critic?: AgentTopicConfig;
   };
   topics: Topic[];
+  /** Optional per-file style config. Absent = use session defaults for all agents. */
+  style_config?: {
+    /** When false, the moderator always speaks plain English regardless of the active style. Default: true. */
+    moderator_applies: boolean;
+  };
+}
+
+// ── Debate Style types ────────────────────────────────────────────────────────
+
+export interface LanguageModule {
+  id: string;
+  label: string;
+  /** Language pair, e.g. "Hindi–English" */
+  pair: string;
+  /** Regional register, e.g. "Delhi / Mumbai" */
+  region: string;
+  /** Script used for romanisation, e.g. "Romanized Hindi" */
+  script: string;
+  /** Common colloquial expressions */
+  colloquials: string[];
+  /** Grammar patterns to follow */
+  grammar_rules: string[];
+}
+
+export interface DebateStyle {
+  id: string;
+  label: string;
+  /**
+   * System-prompt block injected into each agent's prompt to drive code-switching.
+   * null for plain English (no injection).
+   */
+  communication_arch: string | null;
+  /** Language metadata appended after the arch block. null for plain English. */
+  language_module: LanguageModule | null;
+  /**
+   * Whether the style block is injected for the moderator agent.
+   * Defaults to true; overridden per topic file via style_config.moderator_applies.
+   */
+  moderatorApplies: boolean;
 }
 
 export interface Message {

@@ -11,11 +11,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { load as yamlLoad } from "js-yaml";
 import {
-  AgentId, AgentNames, DebateStatus, DEFAULT_AGENT_NAMES,
+  AgentId, AgentNames, DebateStatus, DebateStyle, DEFAULT_AGENT_NAMES,
   DEFAULT_SETTINGS, GateState, LLMSettings, Message, Topic,
   TopicFileContent, TopicFileEntry,
 } from "../types";
 import { loadPersonas, runDebate } from "../debate/orchestrator";
+import {
+  getSessionStyle,
+  setSessionStyle,
+  setSessionModeratorApplies,
+} from "../debate/styles";
 
 export type BackendStatus = "unknown" | "online" | "offline";
 
@@ -55,6 +60,7 @@ export function useDebate() {
     delayMs: 0,
   });
   const [backendStatus, setBackendStatus] = useState<BackendStatus>("unknown");
+  const [activeStyle, setActiveStyleState] = useState<DebateStyle>(() => getSessionStyle());
 
   // Personas loaded once at mount (raw .md bodies, never mutated after load)
   const personasRef = useRef<Record<AgentId, string> | null>(null);
@@ -86,6 +92,11 @@ export function useDebate() {
       }
 
       setTopics(parsed.topics);
+
+      // Sync moderatorApplies from yml style_config into active style
+      const moderatorApplies = parsed.style_config?.moderator_applies ?? true;
+      setSessionModeratorApplies(moderatorApplies);
+      setActiveStyleState((prev) => ({ ...prev, moderatorApplies }));
 
       const agentIds: AgentId[] = ["moderator", "advocate", "critic"];
 
@@ -174,6 +185,12 @@ export function useDebate() {
     setSelectedTopicFile(entry);
     void loadTopicFile(entry, base);
   }, [topicFiles, loadTopicFile]);
+
+  // ── Active style ─────────────────────────────────────────────────────────
+  const setActiveStyle = useCallback((style: DebateStyle) => {
+    setSessionStyle(style);
+    setActiveStyleState(style);
+  }, []);
 
   // ── Settings ─────────────────────────────────────────────────────────────
   const updateSettings = useCallback((patch: Partial<LLMSettings>) => {
@@ -280,7 +297,7 @@ export function useDebate() {
       : settings;
 
     try {
-      await runDebate(topic, personas, effectiveSettings, callbacks, control);
+      await runDebate(topic, personas, effectiveSettings, callbacks, control, getSessionStyle());
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         setError(`Debate error: ${(err as Error).message}`);
@@ -342,5 +359,7 @@ export function useDebate() {
     pauseGate,
     resumeGate,
     backendStatus,
+    activeStyle,
+    setActiveStyle,
   };
 }

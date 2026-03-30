@@ -9,7 +9,8 @@
  * All LLM calls go through streamChat() — no server required.
  */
 import { streamChat, ChatMessage } from "./llmClient";
-import { AgentId, AgentNames, DEFAULT_AGENT_NAMES, LLMSettings, Topic } from "../types";
+import { AgentId, AgentNames, DEFAULT_AGENT_NAMES, DebateStyle, LLMSettings, Topic } from "../types";
+import { getSessionStyle } from "./styles";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,28 @@ export interface OrchestratorControl {
   signal: AbortSignal;
   /** Called between turns; resolves when the user advances or countdown expires */
   waitForGate: (nextAgent: AgentId) => Promise<void>;
+}
+
+// ── Style block builder ───────────────────────────────────────────────────────
+
+/**
+ * Returns the style injection block for a given agent, or "" when:
+ *   - The active style is plain English (no communication_arch), or
+ *   - The agent is the moderator and style.moderatorApplies is false.
+ */
+function buildStyleBlock(style: DebateStyle, agentId: AgentId): string {
+  if (!style.communication_arch) return "";
+  if (agentId === "moderator" && !style.moderatorApplies) return "";
+
+  const lm = style.language_module!;
+  return (
+    `\n\n[Communication Style — ${lm.label}]\n` +
+    `${style.communication_arch}\n\n` +
+    `Language pair: ${lm.pair}. Region: ${lm.region}. Script: ${lm.script}.\n` +
+    `Common expressions: ${lm.colloquials.join(", ")}.\n` +
+    `Grammar patterns:\n` +
+    lm.grammar_rules.map((r) => `  • ${r}`).join("\n")
+  );
 }
 
 // ── Message history builder ───────────────────────────────────────────────────
@@ -98,13 +121,17 @@ async function runTurn(
   control: OrchestratorControl,
   promptSuffix = "",
   bootstrapPrompt?: string,
+  styleBlock = "",
 ): Promise<string> {
   const topicCtx =
     `\n\nDebate topic: **${topic.title}**\n` +
     (topic.description ? `Context: ${topic.description}` : "");
 
   const systemPrompt =
-    persona.trim() + topicCtx + (promptSuffix ? `\n\n${promptSuffix}` : "");
+    persona.trim() +
+    topicCtx +
+    (styleBlock ? styleBlock : "") +
+    (promptSuffix ? `\n\n${promptSuffix}` : "");
 
   const messages = buildMessages(history, agent, systemPrompt, bootstrapPrompt);
 
@@ -144,8 +171,11 @@ export async function runDebate(
   settings: LLMSettings,
   callbacks: OrchestratorCallbacks,
   control: OrchestratorControl,
+  activeStyle?: DebateStyle,
 ): Promise<void> {
   const history: HistoryEntry[] = [];
+  // Fall back to the session singleton if no style was passed explicitly
+  const style = activeStyle ?? getSessionStyle();
 
   let turn = 0;
 
@@ -154,6 +184,7 @@ export async function runDebate(
     "moderator", turn, personas.moderator, topic, history, settings, callbacks, control,
     "",
     `Please open the debate on the following topic:\n\n**${topic.title}**\n\n${topic.description}`,
+    buildStyleBlock(style, "moderator"),
   );
   turn++;
   await control.waitForGate(CYCLE[0]);
@@ -180,6 +211,8 @@ export async function runDebate(
       await runTurn(
         "moderator", turn, personas.moderator, topic, history, settings, callbacks, control,
         CONCLUSION_PROMPT,
+        undefined,
+        buildStyleBlock(style, "moderator"),
       );
       turn++;
       concluded = true;
@@ -189,6 +222,8 @@ export async function runDebate(
     await runTurn(
       agentId, turn, personas[agentId], topic, history, settings, callbacks, control,
       suffix,
+      undefined,
+      buildStyleBlock(style, agentId),
     );
     turn++;
     const nextAgentInCycle = CYCLE[(turn - 1) % 3];
@@ -200,6 +235,8 @@ export async function runDebate(
     await runTurn(
       "moderator", turn, personas.moderator, topic, history, settings, callbacks, control,
       `We have reached the end of our allotted debate time.\n\n${CONCLUSION_PROMPT}`,
+      undefined,
+      buildStyleBlock(style, "moderator"),
     );
   }
 

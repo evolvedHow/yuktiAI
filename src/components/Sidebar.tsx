@@ -7,8 +7,9 @@
  *   - On mobile: becomes a slide-in drawer triggered by a hamburger button
  */
 import { useState } from "react";
-import { DebateStatus, Topic, TopicFileEntry } from "../types";
+import { DebateStatus, DebateStyle, Topic, TopicFileEntry } from "../types";
 import { AudienceControls } from "./AudienceControls";
+import { DEBATE_STYLES, setSessionStyle } from "../debate/styles";
 
 interface Props {
   topicFiles: TopicFileEntry[];
@@ -36,6 +37,12 @@ export function Sidebar({
   onOpenSettings,
 }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeStyle, setActiveStyle] = useState<DebateStyle>(DEBATE_STYLES[0]);
+
+  function handleSelectStyle(style: DebateStyle) {
+    setSessionStyle(style);
+    setActiveStyle(style);
+  }
 
   const inner = (
     <div className="flex flex-col h-full">
@@ -72,6 +79,31 @@ export function Sidebar({
           </select>
         </div>
       )}
+
+      {/* Debate style picker */}
+      <div className="shrink-0 px-3 pb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted px-2 mb-1.5">
+          Debate Style
+        </p>
+        <div className="flex rounded-lg border border-border overflow-hidden text-xs">
+          {DEBATE_STYLES.map((style, i) => (
+            <button
+              key={style.id}
+              onClick={() => handleSelectStyle(style)}
+              className={[
+                "flex-1 py-1.5 px-2 transition-colors leading-none",
+                i > 0 ? "border-l border-border" : "",
+                activeStyle.id === style.id
+                  ? "bg-moderator-bg text-moderator-text font-semibold"
+                  : "bg-white text-ink hover:bg-surface",
+              ].join(" ")}
+              title={`Switch to ${style.label} — takes effect on next debate`}
+            >
+              {style.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Topic list */}
       <div className="flex-1 overflow-y-auto px-3 pb-2">
