@@ -51,6 +51,21 @@ is forwarded through the gateway and never stored server-side.
 Adding another key later needs no frontend change: set one more secret on the
 Worker (`wrangler secret put KEY_<PROVIDER>`) and it appears in the picker.
 
+**One Worker serves every provider — there is no per-provider Worker.** The
+single Worker is selected by the `X-Yukti-Provider` header (or a `provider`
+field in the request body), and each provider's key is a separate secret named
+after the profile (`KEY_GROQ`, `KEY_OPENAI`, `KEY_ANTHROPIC`, …). New providers
+are added by setting a secret plus an optional `EXTRA_PROVIDERS` JSON variable —
+no code change, no redeploy of the app, and no second Worker.
+
+**The Worker itself is not hardcoded anywhere in the app.** The frontend only
+ever reads the gateway URL from `VITE_BACKEND_URL` at build time or from
+**Settings → Key Gateway** at runtime; point that at any deployment you control
+(your own Worker, a fork, a regional endpoint). Blank it and the app falls back
+to direct-to-provider mode. Similarly, per-profile provider base URLs can be
+overridden per deployment (`BASE_URL_<PROVIDER>`), so nothing in the bundle ties
+you to a specific host.
+
 ---
 
 ## Quickstart (local)
@@ -152,6 +167,22 @@ word or character granularity and a speed; **⏩ Skip typing** in the transcript
 paints the rest of the current turn at once. The next agent is not called until
 the current one has finished appearing, so the debate never runs ahead of the
 reader.
+
+---
+
+## When the LLM won't talk
+
+A failed call (no key, wrong key, dead gateway, rate limit) shows up as an error
+card instead of a speech — and the debate **stops rather than replaying that
+card for every remaining turn**.
+
+- A call that dies on the wire is retried up to twice (status shows
+  *"Connection failed — retrying…"*), so one blip doesn't kill a debate.
+- If it keeps failing, the debate ends after that turn; no more LLM calls are
+  made and no error cards are churned out.
+- Starting is guarded too: with **no key at all** the debate won't begin, and if
+  a gateway URL is configured it is pinged first, so an unreachable gateway is
+  reported up front instead of as fourteen identical errors.
 
 ---
 

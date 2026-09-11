@@ -342,6 +342,20 @@ export function useDebate() {
       return;
     }
 
+    // Live reachability check before committing to a debate: the config may
+    // "look" valid while the gateway is actually down, and we'd rather refuse
+    // to start than feed the audience a string of connection-error cards.
+    if (normalizeGatewayUrl(settings.backendUrl)) {
+      const url = normalizeGatewayUrl(settings.backendUrl);
+      try {
+        const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(4500) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch {
+        setError(`Gateway unreachable at ${url}. Check the address in Settings, or switch to Direct mode.`);
+        return;
+      }
+    }
+
     // Cancel any running debate
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -415,6 +429,18 @@ export function useDebate() {
         );
         openRevealQueue(id);
         setReviewState("redoing");
+      },
+
+      // Same card reset as a redo, but for a dead connection instead of a failed
+      // review — the speaker didn't say anything wrong, it just didn't get through.
+      onTurnRetry: (_agent: AgentId, _turn: number, _attempt: number) => {
+        const id = activeIdRef.current;
+        if (!id) return;
+        setMessages((prev) =>
+          prev.map((m) => m.id === id ? { ...m, content: "", streaming: true } : m)
+        );
+        openRevealQueue(id);
+        setReviewState("retrying");
       },
 
       onReviewStage: (stage: ReviewState) => setReviewState(stage),

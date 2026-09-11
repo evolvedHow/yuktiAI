@@ -21,6 +21,14 @@ import { getSessionStyle } from "./styles";
 
 const CYCLE: AgentId[] = ["advocate", "critic", "moderator"];
 
+/**
+ * How many extra times a turn's LLM call is retried when it dies on its feet
+ * (connection dropped, gateway hiccup, timeout). One failed call doesn't kill a
+ * debate, but after this many consecutive failures the debate is stopped rather
+ * than replaying error cards for every remaining turn.
+ */
+const MAX_CONNECT_RETRIES = 2;
+
 const CONCLUSION_PROMPT = `It is now time to conclude this debate.
 
 Please deliver a structured closing summary with exactly these sections:
@@ -52,8 +60,10 @@ export interface OrchestratorCallbacks {
   onQuestionAck: (question: string, turn: number) => void;
   /** Fact-check stage changed for the turn in progress. */
   onReviewStage?: (stage: ReviewState) => void;
-  /** The turn was rejected and is about to be re-delivered — clear the message. */
+  /** The turn was rejected by the fact-checker and is about to be re-delivered — clear the message. */
   onTurnRedo?: (agent: AgentId, turn: number, attempt: number) => void;
+  /** The LLM call failed on the wire; we're wiping and trying the connection again. */
+  onTurnRetry?: (agent: AgentId, turn: number, attempt: number) => void;
   /** Final review for the turn, once it has been accepted. */
   onReview?: (agent: AgentId, turn: number, review: TurnReview) => void;
   onDone: () => void;
@@ -205,7 +215,7 @@ async function runTurn(
   promptSuffix = "",
   bootstrapPrompt?: string,
   styleBlock = "",
-): Promise<string> {
+): Promise<{ content: string; errored: boolean }> {
   const { settings, callbacks, control } = deps;
 
   // A topic that doesn't pick a register debates as serious.
@@ -234,15 +244,27 @@ async function runTurn(
   const reviewEnabled = settings.factCheck.verifyLinks || settings.factCheck.reviewClaims;
 
   let attempt = 0;
+  let errorRetries = 0;
   let accepted = "";
   let review: TurnReview | undefined;
   let redo: RedoContext | undefined;
   /** What superseded attempts were rejected for — kept for the audience. */
   const corrected: Finding[] = [];
 
+  let first = true;
+  /** True when the previous attempt failed on the wire and the card needs wiping. */
+  let pendingRetry = false;
+
   while (true) {
-    if (attempt === 0) callbacks.onTurnStart(agent, turn);
-    else callbacks.onTurnRedo?.(agent, turn, attempt);
+    if (first) {
+      callbacks.onTurnStart(agent, turn);
+      first = false;
+    } else if (pendingRetry) {
+      callbacks.onTurnRetry?.(agent, turn, errorRetries);
+      pendingRetry = false;
+    } else {
+      callbacks.onTurnRedo?.(agent, turn, attempt);
+    }
 
     accepted = await streamTurn(
       agent, turn,
@@ -250,9 +272,18 @@ async function runTurn(
       deps,
     );
 
+    // Wire-level failure (connection dropped, gateway down, timeout). Retry a
+    // few times — a single blip shouldn't end the debate — but if it keeps
+    // failing, give up on this turn.
+    const errored = accepted.startsWith("[Error:");
+    if (errored && errorRetries < MAX_CONNECT_RETRIES) {
+      errorRetries++;
+      pendingRetry = true;
+      continue;
+    }
+
     // A failed call has nothing to check, and the reviewer would just object to
     // the error text.
-    const errored = accepted.startsWith("[Error:");
     if (!reviewEnabled || errored || !accepted.trim()) break;
 
     // reviewTurn emits its own stages — "checking-links" only when the turn
@@ -292,10 +323,11 @@ async function runTurn(
   // A turn that errored or came back empty stays visible in the transcript but
   // never enters the debate history — nothing for a later speaker to build on,
   // and an error string ("[Error: …]") isn't a position to rebut.
-  if (!accepted.startsWith("[Error:") && accepted.trim()) {
+  const finalErrored = accepted.startsWith("[Error:");
+  if (!finalErrored && accepted.trim()) {
     history.push({ agent, content: accepted });
   }
-  return accepted;
+  return { content: accepted, errored: finalErrored };
 }
 
 // ── Main orchestrator ─────────────────────────────────────────────────────────
@@ -337,17 +369,24 @@ export async function runDebate(
   let turn = 0;
 
   // ── Turn 0: Moderator opening ────────────────────────────────────────────
-  await runTurn(
+  const opening = await runTurn(
     "moderator", turn, personas.moderator, topic, history, deps,
     "",
     `Please open the debate on the following topic:\n\n**${topic.title}**\n\n${topic.description}`,
     buildStyleBlock(style, "moderator"),
   );
+  // One look at the LLM tells us whether a debate is even possible — if the
+  // very first call fails, there is no point stringing the audience along.
+  if (opening.errored) {
+    callbacks.onDone();
+    return;
+  }
   turn++;
   await control.waitForGate(CYCLE[0]);
 
   // ── Main loop ─────────────────────────────────────────────────────────────
   let concluded = false;
+  let stopped = false;
 
   while (turn <= settings.maxTurns) {
     const agentId = CYCLE[(turn - 1) % 3];
@@ -383,19 +422,25 @@ export async function runDebate(
         `and invite both the Advocate and the Critic to respond.`;
     }
 
-    await runTurn(
+    const result = await runTurn(
       agentId, turn, personas[agentId], topic, history, deps,
       suffix,
       undefined,
       buildStyleBlock(style, agentId),
     );
     turn++;
+    // The LLM is unavailable right now — stop the debate instead of playing a
+    // tune of error cards for every remaining turn.
+    if (result.errored) {
+      stopped = true;
+      break;
+    }
     const nextAgentInCycle = CYCLE[(turn - 1) % 3];
     await control.waitForGate(nextAgentInCycle);
   }
 
-  // Auto-close if max_turns hit
-  if (!concluded) {
+  // Auto-close if max_turns hit — unless a failing LLM already ended the debate.
+  if (!concluded && !stopped) {
     await runTurn(
       "moderator", turn, personas.moderator, topic, history, deps,
       `We have reached the end of our allotted debate time.\n\n${CONCLUSION_PROMPT}`,

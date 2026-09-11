@@ -161,7 +161,13 @@ export interface TurnReview {
   error?: string;
 }
 
-export type ReviewState = "idle" | "checking-links" | "reviewing" | "redoing" | "done";
+export type ReviewState =
+  | "idle"
+  | "checking-links"
+  | "reviewing"
+  | "redoing"
+  | "retrying"
+  | "done";
 
 export interface Message {
   id: string;

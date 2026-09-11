@@ -29,6 +29,7 @@ const REVIEW_LABEL: Partial<Record<ReviewState, string>> = {
   "checking-links": "Checking cited links…",
   reviewing: "Fact-checking this turn…",
   redoing: "Turn rejected — asking the speaker to redo it…",
+  retrying: "Connection failed — retrying…",
 };
 
 /** How this topic is being fought — serious argument or playful comedy. */
@@ -148,7 +149,7 @@ export function DebateTranscript({
           <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted">
             <span
               className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                reviewState === "redoing" ? "bg-amber-500" : "bg-blue-400"
+                reviewState === "redoing" || reviewState === "retrying" ? "bg-amber-500" : "bg-blue-400"
               }`}
             />
             <span>{REVIEW_LABEL[reviewState]}</span>
