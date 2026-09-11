@@ -29,17 +29,34 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # LLM settings — store these as GitHub Secrets (Settings → Secrets → Actions)
-          VITE_LLM_BASE_URL:    ${{ secrets.VITE_LLM_BASE_URL }}
-          VITE_LLM_API_KEY:     ${{ secrets.VITE_LLM_API_KEY }}
-          VITE_LLM_MODEL:       ${{ secrets.VITE_LLM_MODEL }}
-          VITE_MAX_TOKENS:      ${{ secrets.VITE_MAX_TOKENS }}
-          VITE_TURN_DELAY_MS:   ${{ secrets.VITE_TURN_DELAY_MS }}
-          VITE_MAX_TURNS:       ${{ secrets.VITE_MAX_TURNS }}
-          # Optional: set this secret to bake a backend URL into the Pages build
-          # so users don't need to configure it manually in their browser.
-          # Leave unset to ship in pure direct-to-provider mode.
-          VITE_BACKEND_URL:     ${{ secrets.VITE_BACKEND_URL }}
+          # ── Key gateway (recommended) ──────────────────────────────────────
+          # URL of the Cloudflare Worker in worker/. Baking this in means users
+          # get working keys with no setup, and no key ships in the bundle.
+          # Store as a repository *variable* — it isn't secret.
+          VITE_BACKEND_URL:       ${{ vars.VITE_BACKEND_URL }}
+          VITE_GATEWAY_PROVIDER:  ${{ vars.VITE_GATEWAY_PROVIDER }}
+
+          # ── Direct provider mode (only when no gateway is set) ─────────────
+          # WARNING: VITE_LLM_API_KEY is embedded in the published JavaScript and
+          # is readable by anyone who visits the site. Prefer the gateway above.
+          VITE_LLM_BASE_URL:      ${{ secrets.VITE_LLM_BASE_URL }}
+          VITE_LLM_API_KEY:       ${{ secrets.VITE_LLM_API_KEY }}
+          VITE_LLM_MODEL:         ${{ secrets.VITE_LLM_MODEL }}
+
+          # ── Pacing / reveal defaults ───────────────────────────────────────
+          VITE_MAX_TOKENS:        ${{ vars.VITE_MAX_TOKENS }}
+          VITE_MAX_TURNS:         ${{ vars.VITE_MAX_TURNS }}
+          VITE_TURN_DELAY_MS:     ${{ vars.VITE_TURN_DELAY_MS }}
+          VITE_AUTO_ADVANCE:      ${{ vars.VITE_AUTO_ADVANCE }}
+          VITE_TYPEWRITER:        ${{ vars.VITE_TYPEWRITER }}
+          VITE_TYPEWRITER_MODE:   ${{ vars.VITE_TYPEWRITER_MODE }}
+          VITE_TYPEWRITER_RATE:   ${{ vars.VITE_TYPEWRITER_RATE }}
+
+          # ── Accuracy / fact-checking ───────────────────────────────────────
+          VITE_EVIDENCE_POLICY:   ${{ vars.VITE_EVIDENCE_POLICY }}
+          VITE_VERIFY_LINKS:      ${{ vars.VITE_VERIFY_LINKS }}
+          VITE_REVIEW_CLAIMS:     ${{ vars.VITE_REVIEW_CLAIMS }}
+          VITE_MAX_REDOS:         ${{ vars.VITE_MAX_REDOS }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

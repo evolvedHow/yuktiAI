@@ -46,7 +46,8 @@ export function TurnGate({ gate, agentNames, onAdvance, onPause, onResume }: Pro
 
   // Run / pause the tick
   useEffect(() => {
-    if (!gate.active || gate.paused) {
+    // autoAdvance off → hold here indefinitely until the user clicks through.
+    if (!gate.active || gate.paused || !gate.autoAdvance) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
     }
@@ -66,15 +67,19 @@ export function TurnGate({ gate, agentNames, onAdvance, onPause, onResume }: Pro
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [gate.active, gate.paused]);
+  }, [gate.active, gate.paused, gate.autoAdvance]);
 
   if (!gate.active || !gate.nextAgent) return null;
 
   const agent = gate.nextAgent;
-  const pct = gate.delayMs > 0
-    ? Math.min(100, ((gate.delayMs - remaining) / gate.delayMs) * 100)
-    : 100;
+  const manual = !gate.autoAdvance;
+  const pct = manual
+    ? 100
+    : gate.delayMs > 0
+      ? Math.min(100, ((gate.delayMs - remaining) / gate.delayMs) * 100)
+      : 100;
   const secs = Math.ceil(remaining / 1000);
+  const countdownLabel = manual ? "▸" : gate.paused ? "—" : `${secs}s`;
 
   return (
     <div className="flex items-center gap-3 mx-2 my-1.5 px-4 py-2.5 rounded-xl bg-white border border-border shadow-sm select-none">
@@ -86,7 +91,7 @@ export function TurnGate({ gate, agentNames, onAdvance, onPause, onResume }: Pro
       {/* Clickable progress bar */}
       <button
         onClick={onAdvance}
-        title="Click to advance now"
+        title={manual ? "Click to continue" : "Click to advance now"}
         className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden hover:opacity-75 transition-opacity"
         aria-label="Advance to next turn"
       >
@@ -98,18 +103,20 @@ export function TurnGate({ gate, agentNames, onAdvance, onPause, onResume }: Pro
 
       {/* Countdown */}
       <span className="text-[11px] tabular-nums text-muted w-5 text-right shrink-0">
-        {gate.paused ? "—" : `${secs}s`}
+        {countdownLabel}
       </span>
 
-      {/* Pause / Resume */}
-      <button
-        onClick={gate.paused ? onResume : onPause}
-        title={gate.paused ? "Resume countdown" : "Pause countdown"}
-        className="shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 text-muted hover:text-ink transition-colors text-xs"
-        aria-label={gate.paused ? "Resume" : "Pause"}
-      >
-        {gate.paused ? "▶" : "⏸"}
-      </button>
+      {/* Pause / Resume — meaningless when the gate is already manual */}
+      {!manual && (
+        <button
+          onClick={gate.paused ? onResume : onPause}
+          title={gate.paused ? "Resume countdown" : "Pause countdown"}
+          className="shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 text-muted hover:text-ink transition-colors text-xs"
+          aria-label={gate.paused ? "Resume" : "Pause"}
+        >
+          {gate.paused ? "▶" : "⏸"}
+        </button>
+      )}
 
       {/* Skip arrow */}
       <button

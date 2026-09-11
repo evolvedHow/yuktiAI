@@ -12,10 +12,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { load as yamlLoad } from "js-yaml";
 import {
   AgentId, AgentNames, DebateStatus, DebateStyle, DEFAULT_AGENT_NAMES,
-  DEFAULT_SETTINGS, GateState, LLMSettings, Message, Topic,
-  TopicFileContent, TopicFileEntry,
+  DEFAULT_SETTINGS, GatewayInfo, GateState, LLMSettings, Message, ReviewState,
+  Topic, TopicFileContent, TopicFileEntry, TopicRegister, TurnReview,
 } from "../types";
 import { loadPersonas, runDebate } from "../debate/orchestrator";
+import {
+  describeConfigProblem,
+  fetchGatewayInfo,
+  normalizeGatewayUrl,
+} from "../debate/gateway";
+import { RevealQueue } from "../debate/typewriter";
 import {
   DEFAULT_ENGLISH_STYLE,
   getSessionStyle,
@@ -27,17 +33,44 @@ import {
 export type BackendStatus = "unknown" | "online" | "offline";
 
 const SETTINGS_KEY = "yuktiai_settings";
+const CUSTOM_TOPICS_KEY = "yuktiai_custom_topics";
+const MAX_SAVED_CUSTOM_TOPICS = 12;
 
 function loadSettings(): LLMSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) {
+      const stored = JSON.parse(raw) as Partial<LLMSettings>;
+      return {
+        ...DEFAULT_SETTINGS,
+        ...stored,
+        // Nested block needs its own merge so settings saved before the
+        // typewriter existed still pick up the new defaults.
+        typewriter: { ...DEFAULT_SETTINGS.typewriter, ...(stored.typewriter ?? {}) },
+      };
+    }
   } catch {/* ignore */}
   return { ...DEFAULT_SETTINGS };
 }
 
 function saveSettings(s: LLMSettings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+
+function loadCustomTopics(): Topic[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_TOPICS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (t): t is Topic =>
+        typeof t === "object" && t !== null &&
+        typeof (t as Topic).id === "string" && typeof (t as Topic).title === "string",
+    );
+  } catch {
+    return [];
+  }
 }
 
 let _msgCounter = 0;
@@ -60,14 +93,26 @@ export function useDebate() {
     nextAgent: null,
     paused: false,
     delayMs: 0,
+    autoAdvance: true,
   });
   const [backendStatus, setBackendStatus] = useState<BackendStatus>("unknown");
+  const [gatewayInfo, setGatewayInfo] = useState<GatewayInfo | null>(null);
   const [debateStyles, setDebateStyles] = useState<DebateStyle[]>([DEFAULT_ENGLISH_STYLE]);
   const [activeStyle, setActiveStyleState] = useState<DebateStyle>(DEFAULT_ENGLISH_STYLE);
+  const [customTopics, setCustomTopics] = useState<Topic[]>(loadCustomTopics);
+  /** true while buffered text is still being typed onto the screen. */
+  const [revealing, setRevealing] = useState(false);
+  /** Which fact-check stage the current turn is in, for the status strip. */
+  const [reviewState, setReviewState] = useState<ReviewState>("idle");
 
   // Personas loaded once at mount (raw .md bodies, never mutated after load)
   const personasRef = useRef<Record<AgentId, string> | null>(null);
   const basePersonasRef = useRef<Record<AgentId, string> | null>(null);
+  // Shared sourcing rules + fact-checker prompt from public/agents/
+  const evidencePolicyRef = useRef("");
+  const checkerPersonaRef = useRef("");
+  // Register guidance blocks (public/agents/register-*.md), injected per debate
+  const registerBlocksRef = useRef<Partial<Record<TopicRegister, string>>>({});
   // Base agent names derived from persona .md files
   const baseAgentNamesRef = useRef<AgentNames>(DEFAULT_AGENT_NAMES);
 
@@ -78,6 +123,9 @@ export function useDebate() {
 
   // Active message id being streamed
   const activeIdRef = useRef<string | null>(null);
+
+  // Typewriter queue for the turn currently being revealed (one per turn)
+  const revealRef = useRef<RevealQueue | null>(null);
 
   // Gate resolver ref — holds the resolve fn of the current waitForGate promise
   const gateResolverRef = useRef<(() => void) | null>(null);
@@ -157,10 +205,13 @@ export function useDebate() {
 
     // Load agent personas from .md files
     loadPersonas(base)
-      .then(({ personas, agentNames: names }) => {
+      .then(({ personas, agentNames: names, evidencePolicy, checkerPersona, registerBlocks }) => {
         personasRef.current = personas;
         basePersonasRef.current = personas;
         baseAgentNamesRef.current = names;
+        evidencePolicyRef.current = evidencePolicy;
+        checkerPersonaRef.current = checkerPersona;
+        registerBlocksRef.current = registerBlocks;
         // Will be overridden if a topic file has agent overrides, but set base now
         setAgentNames(names);
       })
@@ -178,18 +229,48 @@ export function useDebate() {
       .catch(() => setError("Failed to load styles/index.json"));
   }, [loadTopicFile]);
 
-  // ── Backend health check ─────────────────────────────────────────────────
+  // ── Gateway health + provider catalogue ──────────────────────────────────
   useEffect(() => {
-    const url = settings.backendUrl.trim();
+    const url = normalizeGatewayUrl(settings.backendUrl);
     if (!url) {
       setBackendStatus("unknown");
+      setGatewayInfo(null);
       return;
     }
+
+    const controller = new AbortController();
     setBackendStatus("unknown");
-    fetch(`${url}/health`, { signal: AbortSignal.timeout(4000) })
+
+    fetch(`${url}/health`, { signal: controller.signal })
       .then((r) => setBackendStatus(r.ok ? "online" : "offline"))
-      .catch(() => setBackendStatus("offline"));
+      .catch(() => { if (!controller.signal.aborted) setBackendStatus("offline"); });
+
+    // The Python backend has no /providers route; a failure here just means
+    // "no profile picker", not "gateway down".
+    fetchGatewayInfo(url, controller.signal)
+      .then(setGatewayInfo)
+      .catch(() => { if (!controller.signal.aborted) setGatewayInfo(null); });
+
+    return () => controller.abort();
   }, [settings.backendUrl]);
+
+  // Keep the selected provider valid as the catalogue loads or changes.
+  useEffect(() => {
+    if (!gatewayInfo || gatewayInfo.providers.length === 0) return;
+    const known = gatewayInfo.providers.some((p) => p.id === settings.gatewayProviderId);
+    if (known) return;
+
+    const fallback =
+      gatewayInfo.providers.find((p) => p.id === gatewayInfo.defaultProvider) ??
+      gatewayInfo.providers.find((p) => p.hasServerKey) ??
+      gatewayInfo.providers[0];
+
+    setSettingsState((prev) => {
+      const next = { ...prev, gatewayProviderId: fallback.id };
+      saveSettings(next);
+      return next;
+    });
+  }, [gatewayInfo, settings.gatewayProviderId]);
 
   // ── Switch topic file ────────────────────────────────────────────────────
   const selectTopicFile = useCallback((file: string) => {
@@ -215,6 +296,39 @@ export function useDebate() {
     });
   }, []);
 
+  // ── Custom topics ────────────────────────────────────────────────────────
+  const addCustomTopic = useCallback((topic: Topic) => {
+    setCustomTopics((prev) => {
+      const deduped = prev.filter(
+        (t) => t.title.trim().toLowerCase() !== topic.title.trim().toLowerCase(),
+      );
+      const next = [topic, ...deduped].slice(0, MAX_SAVED_CUSTOM_TOPICS);
+      localStorage.setItem(CUSTOM_TOPICS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const removeCustomTopic = useCallback((id: string) => {
+    setCustomTopics((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      localStorage.setItem(CUSTOM_TOPICS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  // ── Typewriter reveal ────────────────────────────────────────────────────
+  /** Paints the rest of the current turn immediately. */
+  const skipReveal = useCallback(() => {
+    revealRef.current?.flush();
+  }, []);
+
+  /** Tears down the queue — used when a debate is aborted, replaced, or errors. */
+  const abandonReveal = useCallback(() => {
+    revealRef.current?.flush();
+    revealRef.current = null;
+    setRevealing(false);
+  }, []);
+
   // ── Start debate ─────────────────────────────────────────────────────────
   const startDebate = useCallback(async (topic: Topic) => {
     const personas = personasRef.current as Record<AgentId, string> | null;
@@ -222,20 +336,24 @@ export function useDebate() {
       setError("Agent personas not loaded yet — please wait a moment and try again.");
       return;
     }
-    const usingBackend = Boolean(settings.backendUrl.trim());
-    if (!usingBackend && !settings.apiKey.trim()) {
-      setError("No API key — open Settings and enter your key, or configure a backend server.");
+    const problem = describeConfigProblem(settings, gatewayInfo);
+    if (problem) {
+      setError(problem);
       return;
     }
 
     // Cancel any running debate
     abortRef.current?.abort();
     abortRef.current = new AbortController();
+    abandonReveal();
     concludeFlagRef.current = false;
     pendingQRef.current = null;
     activeIdRef.current = null;
     gateResolverRef.current = null;
-    setGateState({ active: false, nextAgent: null, paused: false, delayMs: 0 });
+    setGateState({
+      active: false, nextAgent: null, paused: false, delayMs: 0, autoAdvance: settings.autoAdvance,
+    });
+    setRevealing(false);
 
     setActiveTopic(topic);
     setMessages([]);
@@ -258,9 +376,21 @@ export function useDebate() {
             nextAgent,
             paused: false,
             delayMs: settings.interTurnDelayMs,
+            autoAdvance: settings.autoAdvance,
           });
         });
       },
+    };
+
+    // A fresh queue per attempt, so a skip on one turn doesn't disable the
+    // typewriter for the rest of the debate.
+    const openRevealQueue = (id: string) => {
+      revealRef.current = new RevealQueue(settings.typewriter, (chunk) => {
+        setMessages((prev) =>
+          prev.map((m) => m.id === id ? { ...m, content: m.content + chunk } : m)
+        );
+      });
+      setRevealing(settings.typewriter.enabled);
     };
 
     const callbacks = {
@@ -271,21 +401,45 @@ export function useDebate() {
           ...prev,
           { id, agent, content: "", turn, timestamp: new Date().toISOString(), streaming: true },
         ]);
+        openRevealQueue(id);
+        setReviewState("idle");
       },
-      onToken: (_agent: AgentId, token: string, _turn: number) => {
+
+      // A rejected turn is re-delivered into the same card: wipe what was there
+      // and start a fresh reveal, so the audience sees one clean statement.
+      onTurnRedo: (_agent: AgentId, _turn: number, _attempt: number) => {
         const id = activeIdRef.current;
         if (!id) return;
         setMessages((prev) =>
-          prev.map((m) => m.id === id ? { ...m, content: m.content + token } : m)
+          prev.map((m) => m.id === id ? { ...m, content: "", streaming: true } : m)
         );
+        openRevealQueue(id);
+        setReviewState("redoing");
       },
-      onTurnEnd: (_agent: AgentId, _content: string, _turn: number) => {
+
+      onReviewStage: (stage: ReviewState) => setReviewState(stage),
+
+      onReview: (_agent: AgentId, _turn: number, review: TurnReview) => {
+        const id = activeIdRef.current;
+        if (!id) return;
+        setMessages((prev) => prev.map((m) => m.id === id ? { ...m, review } : m));
+      },
+      onToken: (_agent: AgentId, token: string, _turn: number) => {
+        revealRef.current?.push(token);
+      },
+      onTurnEnd: async (_agent: AgentId, _content: string, _turn: number) => {
+        // Wait for the buffered text to finish appearing before the next call.
+        await revealRef.current?.close();
+        revealRef.current = null;
+        setRevealing(false);
+
         const id = activeIdRef.current;
         if (!id) return;
         setMessages((prev) =>
           prev.map((m) => m.id === id ? { ...m, streaming: false } : m)
         );
-        activeIdRef.current = null;
+        // activeIdRef stays set through the fact-check pass — a redo or a
+        // review verdict still needs to find this card. onTurnStart replaces it.
       },
       onQuestionAck: (question: string, turn: number) => {
         setMessages((prev) => [
@@ -300,25 +454,36 @@ export function useDebate() {
           },
         ]);
       },
-      onDone: () => setStatus("done"),
+      onDone: () => {
+        setReviewState("idle");
+        setStatus("done");
+      },
     };
 
-    // When a backend is configured, route all LLM calls through it.
-    // The backend exposes an OpenAI-compatible /v1/chat/completions endpoint
-    // and holds the API key server-side, so we don't need one in the browser.
-    const effectiveSettings = usingBackend
-      ? { ...settings, baseUrl: `${settings.backendUrl.trim()}/v1`, apiKey: "" }
-      : settings;
-
+    // runDebate resolves the endpoint per call (direct provider vs. gateway) —
+    // see resolveEndpoint in debate/gateway.ts.
     try {
-      await runDebate(topic, personas, effectiveSettings, callbacks, control, getSessionStyle());
+      await runDebate(topic, personas, settings, callbacks, control, getSessionStyle(), {
+        evidencePolicy: evidencePolicyRef.current,
+        checkerPersona: checkerPersonaRef.current,
+        registerBlocks: registerBlocksRef.current,
+        agentNames,
+      });
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         setError(`Debate error: ${(err as Error).message}`);
       }
+      abandonReveal();
+      // If we aborted mid-stream, onTurnEnd never ran — stop the caret so the
+      // partial turn isn't stuck blinking forever.
+      const id = activeIdRef.current;
+      if (id) {
+        setMessages((prev) => prev.map((m) => m.id === id ? { ...m, streaming: false } : m));
+      }
+      setReviewState("idle");
       setStatus("done");
     }
-  }, [settings]);
+  }, [settings, gatewayInfo, abandonReveal, agentNames]);
 
   // ── Audience controls ────────────────────────────────────────────────────
   const askQuestion = useCallback((question: string) => {
@@ -332,8 +497,15 @@ export function useDebate() {
 
   const stopDebate = useCallback(() => {
     abortRef.current?.abort();
+    abandonReveal();
+    // On a mid-stream abort onTurnEnd won't fire — clear the blinking caret.
+    const id = activeIdRef.current;
+    if (id) {
+      setMessages((prev) => prev.map((m) => m.id === id ? { ...m, streaming: false } : m));
+    }
+    setReviewState("idle");
     setStatus("done");
-  }, []);
+  }, [abandonReveal]);
 
   const advanceTurn = useCallback(() => {
     const resolve = gateResolverRef.current;
@@ -357,6 +529,9 @@ export function useDebate() {
     selectedTopicFile,
     selectTopicFile,
     topics,
+    customTopics,
+    addCustomTopic,
+    removeCustomTopic,
     activeTopic,
     messages,
     status,
@@ -373,6 +548,10 @@ export function useDebate() {
     pauseGate,
     resumeGate,
     backendStatus,
+    gatewayInfo,
+    revealing,
+    skipReveal,
+    reviewState,
     debateStyles,
     activeStyle,
     setActiveStyle,

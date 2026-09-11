@@ -2,7 +2,9 @@
  * Main debate transcript panel — auto-scrolls as new messages arrive.
  */
 import { useEffect, useRef } from "react";
-import { AgentNames, DebateStatus, GateState, Message, Topic } from "../types";
+import {
+  AgentNames, DebateStatus, GateState, Message, resolveRegister, ReviewState, Topic,
+} from "../types";
 import { MessageCard } from "./MessageCard";
 import { TurnGate } from "./TurnGate";
 import { printDebatePDF } from "../utils/exportPDF";
@@ -16,9 +18,40 @@ interface Props {
   onAdvance: () => void;
   onPause: () => void;
   onResume: () => void;
+  /** true while the typewriter is still painting the current turn */
+  revealing: boolean;
+  onSkipReveal: () => void;
+  /** Fact-check stage for the turn in progress. */
+  reviewState: ReviewState;
 }
 
-export function DebateTranscript({ topic, messages, status, agentNames, gateState, onAdvance, onPause, onResume }: Props) {
+const REVIEW_LABEL: Partial<Record<ReviewState, string>> = {
+  "checking-links": "Checking cited links…",
+  reviewing: "Fact-checking this turn…",
+  redoing: "Turn rejected — asking the speaker to redo it…",
+};
+
+/** How this topic is being fought — serious argument or playful comedy. */
+function RegisterBadge({ register }: { register: "serious" | "frivolous" }) {
+  return (
+    <span
+      title={register === "frivolous" ? "Playful register — comedy licence, low stakes" : "Serious register — real stakes, evidence-facing"}
+      className={[
+        "text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border",
+        register === "frivolous"
+          ? "border-amber-300 bg-amber-50 text-amber-700"
+          : "border-slate-300 bg-white text-slate-600",
+      ].join(" ")}
+    >
+      {register === "frivolous" ? "Playful" : "Serious"}
+    </span>
+  );
+}
+
+export function DebateTranscript({
+  topic, messages, status, agentNames, gateState,
+  onAdvance, onPause, onResume, revealing, onSkipReveal, reviewState,
+}: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll on new content
@@ -62,6 +95,7 @@ export function DebateTranscript({ topic, messages, status, agentNames, gateStat
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <RegisterBadge register={resolveRegister(topic.register)} />
           <span
             className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${badge[status].cls}`}
           >
@@ -96,8 +130,33 @@ export function DebateTranscript({ topic, messages, status, agentNames, gateStat
           />
         )}
 
+        {/* Skip the typewriter for the turn currently being revealed */}
+        {revealing && !gateState.active && (
+          <div className="flex items-center gap-2 px-4 py-1.5">
+            <button
+              onClick={onSkipReveal}
+              className="text-[11px] text-muted hover:text-ink border border-border rounded-full px-2.5 py-1 bg-white hover:bg-gray-50 transition-colors"
+              title="Show the rest of this response immediately"
+            >
+              ⏩ Skip typing
+            </button>
+          </div>
+        )}
+
+        {/* Fact-check progress for the turn that just finished speaking */}
+        {REVIEW_LABEL[reviewState] && !revealing && (
+          <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted">
+            <span
+              className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                reviewState === "redoing" ? "bg-amber-500" : "bg-blue-400"
+              }`}
+            />
+            <span>{REVIEW_LABEL[reviewState]}</span>
+          </div>
+        )}
+
         {/* Typing indicator — only while LLM is generating (gate not active) */}
-        {status === "active" && !gateState.active && messages.length > 0 && !messages[messages.length - 1].streaming && (
+        {status === "active" && !revealing && !REVIEW_LABEL[reviewState] && !gateState.active && messages.length > 0 && !messages[messages.length - 1].streaming && (
           <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted">
             <span className="flex gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-muted animate-bounce [animation-delay:0ms]" />

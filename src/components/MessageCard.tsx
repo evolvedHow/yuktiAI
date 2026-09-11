@@ -1,5 +1,7 @@
-import React from "react";
+import { memo } from "react";
 import { AgentId, AgentNames, Message } from "../types";
+import { Markdown } from "./Markdown";
+import { ReviewPanel } from "./ReviewPanel";
 
 // ── Agent style metadata (colors only — names come from .md frontmatter) ──────
 
@@ -33,14 +35,6 @@ const AGENT_STYLE: Record<
   },
 };
 
-// ── Streaming cursor ──────────────────────────────────────────────────────────
-
-function Cursor() {
-  return (
-    <span className="inline-block w-0.5 h-4 bg-current ml-0.5 animate-pulse align-middle" />
-  );
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -48,7 +42,7 @@ interface Props {
   agentNames: AgentNames;
 }
 
-export function MessageCard({ message, agentNames }: Props) {
+function MessageCardInner({ message, agentNames }: Props) {
   const style = AGENT_STYLE[message.agent];
   const { name, initial, trait } = agentNames[message.agent];
   // "Narada-Muni · Moderator" — omit role suffix for audience
@@ -105,58 +99,28 @@ export function MessageCard({ message, agentNames }: Props) {
         <span className="text-[10px] text-muted ml-auto">{ts}</span>
       </div>
 
-      {/* Body */}
-      <div className="text-sm text-ink leading-relaxed whitespace-pre-wrap break-words">
-        {renderMarkdownLight(message.content)}
-        {message.streaming && <Cursor />}
+      {/* Body — the blinking caret while streaming is the ::after rule in
+          index.css, so it sits inline at the end of the last block. */}
+      <div
+        className={`markdown-body text-sm text-ink leading-relaxed break-words ${
+          message.streaming ? "is-streaming" : ""
+        }`}
+      >
+        <Markdown content={message.content} links={message.review?.links} />
       </div>
+
+      {message.review && <ReviewPanel review={message.review} />}
     </div>
   );
 }
 
-// ── Minimal inline-markdown renderer (bold + bullet lists) ────────────────────
-// Full markdown via a library would bloat the bundle; these cover agent output.
-
-function renderMarkdownLight(text: string): React.ReactNode[] {
-  const lines = text.split("\n");
-  const nodes: React.ReactNode[] = [];
-  let key = 0;
-
-  for (const line of lines) {
-    // Bullet list
-    if (/^[-*]\s/.test(line)) {
-      nodes.push(
-        <div key={key++} className="flex gap-2 my-0.5">
-          <span className="text-muted shrink-0 mt-0.5">•</span>
-          <span>{inlineBold(line.slice(2), key)}</span>
-        </div>,
-      );
-    }
-    // Heading (###)
-    else if (/^###\s/.test(line)) {
-      nodes.push(
-        <p key={key++} className="font-semibold mt-2 mb-0.5">
-          {inlineBold(line.slice(4), key)}
-        </p>,
-      );
-    }
-    // Blank line → spacing
-    else if (line.trim() === "") {
-      nodes.push(<div key={key++} className="h-1.5" />);
-    }
-    // Normal paragraph
-    else {
-      nodes.push(<p key={key++}>{inlineBold(line, key)}</p>);
-    }
-  }
-  return nodes;
-}
-
-function inlineBold(text: string, baseKey: number): React.ReactNode[] {
-  const parts = text.split(/\*\*(.*?)\*\*/g);
-  return parts.map((part, i) =>
-    i % 2 === 1
-      ? <strong key={`${baseKey}-b${i}`} className="font-semibold">{part}</strong>
-      : <React.Fragment key={`${baseKey}-t${i}`}>{part}</React.Fragment>,
-  );
-}
+/**
+ * Memoised: every revealed chunk replaces the whole message array, which would
+ * otherwise re-parse the markdown of every completed turn on each frame.
+ */
+export const MessageCard = memo(MessageCardInner, (prev, next) =>
+  prev.message.content === next.message.content &&
+  prev.message.streaming === next.message.streaming &&
+  prev.message.review === next.message.review &&
+  prev.agentNames === next.agentNames,
+);

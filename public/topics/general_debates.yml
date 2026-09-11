@@ -24,12 +24,14 @@ agents:
 
 topics:
   - id: dosa_vs_iddlis
+    register: frivolous
     title: "Dosas vs. Idlis: The Ultimate South Indian Breakfast Debate"
     description: >
       Which is the superior South Indian breakfast dish: the crispy, savory dosa
       or the soft, steamed idli? A light-hearted battle of tradition, texture, and taste.
 
   - id: climate
+    register: serious
     title: "Climate Change Mitigation"
     description: >
       What are the most effective and equitable policies for reducing greenhouse gas
@@ -37,6 +39,7 @@ topics:
       renewable energy, geoengineering, and international cooperation.
 
   - id: ubi
+    register: serious
     title: "Universal Basic Income"
     description: >
       Should governments implement a universal basic income — a regular, unconditional
@@ -45,6 +48,7 @@ topics:
       feasibility.
 
   - id: charter_cities
+    register: serious
     title: "Charter Cities & Special Economic Zones"
     description: >
       Should developing nations create semi-autonomous 'charter cities' with independent
@@ -52,6 +56,7 @@ topics:
       development? Debate covers sovereignty, inequality, and post-colonial concerns.
 
   - id: digital_privacy
+    register: serious
     title: "Encryption vs. Lawful Access"
     description: >
       Should tech companies be required to provide law-enforcement backdoor access to
@@ -59,6 +64,7 @@ topics:
       civil liberties, and the technical impossibility of 'safe' backdoors.
 
   - id: ranked_choice
+    register: serious
     title: "Ranked-Choice Voting for National Elections"
     description: >
       Should plurality-voting democracies adopt ranked-choice voting for federal
@@ -66,6 +72,7 @@ topics:
       voting, and representational outcomes.
 
   - id: ai_regulation
+    register: serious
     title: "Regulating Frontier AI Development"
     description: >
       Should governments impose mandatory safety evaluations, capability thresholds,

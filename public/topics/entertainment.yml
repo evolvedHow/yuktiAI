@@ -31,6 +31,7 @@ agents:
 
 topics:
   - id: streaming_cinema
+    register: frivolous
     title: "Streaming vs. Cinema: Is the Theatre Experience Dying?"
     description: >
       Has the rise of Netflix, Prime, and Disney+ permanently altered the
@@ -38,6 +39,7 @@ topics:
       offer something irreplaceable that streaming can never replicate?
 
   - id: bollywood_hollywood
+    register: frivolous
     title: "Bollywood vs. Hollywood: Which Cinema Tradition Is Greater?"
     description: >
       Does Bollywood's emotional richness, musical tradition, and sheer scale
@@ -45,6 +47,7 @@ topics:
       technical mastery, global reach, and genre diversity give it the edge?
 
   - id: remakes_originals
+    register: frivolous
     title: "Remakes and Reboots: Creative Laziness or Cultural Evolution?"
     description: >
       Is Hollywood's remake culture a cynical cash grab that cannibalises
@@ -52,6 +55,7 @@ topics:
       of timeless stories?
 
   - id: social_media_culture
+    register: frivolous
     title: "Social Media: Has It Helped or Harmed Popular Culture?"
     description: >
       Has the democratisation of cultural production through social media
@@ -59,6 +63,7 @@ topics:
       out deep artistic work in a flood of fleeting, algorithm-driven content?
 
   - id: reality_tv
+    register: frivolous
     title: "Reality TV: Cultural Guilty Pleasure or Genuine Art Form?"
     description: >
       Is reality television a legitimate genre that surfaces authentic human

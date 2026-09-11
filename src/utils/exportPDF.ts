@@ -1,68 +1,26 @@
+import { createElement } from "react";
 import { AgentNames, Message, Topic } from "../types";
+import { Markdown } from "../components/Markdown";
 
-// ── Minimal markdown → HTML converter for debate content ─────────────────────
-
-function mdToHtml(text: string): string {
-  const lines = text.split("\n");
-  const out: string[] = [];
-  let inList = false;
-
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-
-    // Headings
-    if (/^### /.test(line)) {
-      if (inList) { out.push("</ul>"); inList = false; }
-      out.push(`<h4>${inlineFormat(line.slice(4))}</h4>`);
-      continue;
-    }
-    if (/^## /.test(line)) {
-      if (inList) { out.push("</ul>"); inList = false; }
-      out.push(`<h3>${inlineFormat(line.slice(3))}</h3>`);
-      continue;
-    }
-    if (/^# /.test(line)) {
-      if (inList) { out.push("</ul>"); inList = false; }
-      out.push(`<h2>${inlineFormat(line.slice(2))}</h2>`);
-      continue;
-    }
-
-    // Bullet list items (- or *)
-    if (/^[-*] /.test(line)) {
-      if (!inList) { out.push("<ul>"); inList = true; }
-      out.push(`<li>${inlineFormat(line.slice(2))}</li>`);
-      continue;
-    }
-
-    // Numbered list (1. 2. etc.)
-    if (/^\d+\. /.test(line)) {
-      if (!inList) { out.push("<ul>"); inList = true; }
-      out.push(`<li>${inlineFormat(line.replace(/^\d+\. /, ""))}</li>`);
-      continue;
-    }
-
-    // End list on blank line or non-list content
-    if (inList) { out.push("</ul>"); inList = false; }
-
-    if (line === "") {
-      out.push("<br>");
-    } else {
-      out.push(`<p>${inlineFormat(line)}</p>`);
-    }
-  }
-
-  if (inList) out.push("</ul>");
-  return out.join("\n");
-}
-
-function inlineFormat(text: string): string {
+/** Escapes text that goes into the cover page, which is not markdown. */
+function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/_(.+?)_/g, "<em>$1</em>");
+    .replace(/>/g, "&gt;");
+}
+
+/**
+ * Renders each message body with the same Markdown component the transcript
+ * uses, so the PDF matches what was on screen — links, tables, images and all.
+ * react-dom/server is imported on demand, keeping ~23 kB out of the main bundle
+ * for everyone who never exports.
+ */
+async function renderBodies(messages: Message[]): Promise<string[]> {
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  return messages.map((msg) =>
+    renderToStaticMarkup(createElement(Markdown, { content: msg.content.trim() })),
+  );
 }
 
 // ── Color palette (matches app theme) ────────────────────────────────────────
@@ -76,7 +34,12 @@ const AGENT_COLORS: Record<string, { bg: string; border: string; name: string; i
 
 // ── Build the print HTML document ─────────────────────────────────────────────
 
-function buildPrintHTML(topic: Topic, messages: Message[], agentNames: AgentNames): string {
+function buildPrintHTML(
+  topic: Topic,
+  messages: Message[],
+  agentNames: AgentNames,
+  bodies: string[],
+): string {
   const now = new Date().toISOString().slice(0, 10);
   const turnCount = messages.filter((m) => m.agent !== "audience").length;
 
@@ -99,13 +62,13 @@ function buildPrintHTML(topic: Topic, messages: Message[], agentNames: AgentName
     audience:  "?",
   };
 
-  const messageBlocks = messages.map((msg) => {
+  const messageBlocks = messages.map((msg, i) => {
     const c = AGENT_COLORS[msg.agent] ?? AGENT_COLORS.audience;
     const label = labelFor[msg.agent] ?? msg.agent;
     const role  = roleFor[msg.agent] ?? "";
     const init  = initialFor[msg.agent] ?? "?";
     const ts    = msg.timestamp.slice(0, 16).replace("T", " ") + " UTC";
-    const body  = mdToHtml(msg.content.trim());
+    const body  = bodies[i] ?? "";
     const isAudience = msg.agent === "audience";
 
     return `
@@ -113,7 +76,7 @@ function buildPrintHTML(topic: Topic, messages: Message[], agentNames: AgentName
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
         <div style="width:30px;height:30px;border-radius:50%;background:${c.initial};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">${init}</div>
         <div>
-          <span style="font-weight:600;color:${c.name};font-size:13px;">${label}</span>
+          <span style="font-weight:600;color:${c.name};font-size:13px;">${escapeHtml(label)}</span>
           ${role ? `<span style="color:#9CA3AF;font-size:11px;margin-left:6px;">${role}</span>` : ""}
           <span style="color:#D1D5DB;font-size:11px;margin-left:6px;">·</span>
           <span style="color:#9CA3AF;font-size:11px;margin-left:4px;">Turn ${msg.turn}</span>
@@ -128,7 +91,7 @@ function buildPrintHTML(topic: Topic, messages: Message[], agentNames: AgentName
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Debate: ${topic.title}</title>
+<title>Debate: ${escapeHtml(topic.title)}</title>
 <style>
   @page {
     margin: 0.85in 0.9in;
@@ -210,11 +173,29 @@ function buildPrintHTML(topic: Topic, messages: Message[], agentNames: AgentName
     padding-bottom: 4pt;
     margin: 20pt 0 12pt;
   }
+  /* Markdown bodies — mirrors the on-screen renderer for print. */
   .message p { margin: 0 0 6px; }
-  .message h2, .message h3, .message h4 { margin: 8px 0 4px; font-size: 12.5px; }
-  .message ul { margin: 4px 0 6px 18px; padding: 0; }
+  .message h1, .message h2, .message h3,
+  .message h4, .message h5, .message h6 { margin: 8px 0 4px; font-size: 12.5px; font-weight: 600; }
+  .message ul, .message ol { margin: 4px 0 6px 18px; padding: 0; }
   .message li { margin-bottom: 3px; }
-  .message br { display: block; margin: 4px 0; content: ""; }
+  .message a { color: #1D4ED8; text-decoration: underline; word-break: break-word; }
+  /* Links are not clickable on paper — print the destination after them. */
+  .message a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 9px;
+    color: #6B7280;
+    word-break: break-all;
+  }
+  .message img { max-width: 100%; height: auto; border: 1px solid #E5E7EB; border-radius: 6px; margin: 6px 0; display: block; }
+  .message table { border-collapse: collapse; width: 100%; font-size: 11px; margin: 6px 0; }
+  .message th, .message td { border: 1px solid #E5E7EB; padding: 4px 6px; text-align: left; vertical-align: top; }
+  .message th { background: rgba(0,0,0,0.03); font-weight: 600; }
+  .message pre { background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px; padding: 8px; overflow-x: auto; font-size: 10.5px; margin: 6px 0; white-space: pre-wrap; word-break: break-word; }
+  .message code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background: rgba(0,0,0,0.05); padding: 1px 3px; border-radius: 3px; }
+  .message pre code { background: none; padding: 0; font-size: inherit; }
+  .message blockquote { border-left: 2px solid #E5E7EB; padding-left: 10px; margin: 6px 0; color: #4B5563; font-style: italic; }
+  .message hr { border: none; border-top: 1px solid #E5E7EB; margin: 8px 0; }
   @media print {
     .no-print { display: none !important; }
   }
@@ -224,14 +205,14 @@ function buildPrintHTML(topic: Topic, messages: Message[], agentNames: AgentName
 
 <div class="cover">
   <div class="cover-eyebrow">YuktiAI · Debate Transcript</div>
-  <h1 class="cover-title">${topic.title}</h1>
-  ${topic.description ? `<p class="cover-desc">${topic.description}</p>` : ""}
+  <h1 class="cover-title">${escapeHtml(topic.title)}</h1>
+  ${topic.description ? `<p class="cover-desc">${escapeHtml(topic.description)}</p>` : ""}
   <table class="meta-table">
     <tr><td>Date</td><td>${now}</td></tr>
     <tr><td>Turns</td><td>${turnCount}</td></tr>
-    <tr><td>Moderator</td><td>${agentNames.moderator.name}</td></tr>
-    <tr><td>Advocate</td><td>${agentNames.advocate.name}</td></tr>
-    <tr><td>Critic</td><td>${agentNames.critic.name}</td></tr>
+    <tr><td>Moderator</td><td>${escapeHtml(agentNames.moderator.name)}</td></tr>
+    <tr><td>Advocate</td><td>${escapeHtml(agentNames.advocate.name)}</td></tr>
+    <tr><td>Critic</td><td>${escapeHtml(agentNames.critic.name)}</td></tr>
   </table>
 </div>
 
@@ -246,17 +227,52 @@ ${messageBlocks}
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 export function printDebatePDF(topic: Topic, messages: Message[], agentNames: AgentNames): void {
-  const html = buildPrintHTML(topic, messages, agentNames);
+  // Open synchronously, inside the click's user-gesture window — awaiting the
+  // markdown renderer first would get the pop-up blocked.
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
     alert("Pop-up blocked — please allow pop-ups for this site to export the PDF.");
     return;
   }
-  win.document.write(html);
-  win.document.close();
-  // Give the browser a moment to render before opening the print dialog
-  win.addEventListener("load", () => {
-    win.focus();
-    win.print();
+  win.document.write("<!DOCTYPE html><title>Preparing transcript…</title>");
+
+  void (async () => {
+    try {
+      const bodies = await renderBodies(messages);
+      win.document.open();
+      win.document.write(buildPrintHTML(topic, messages, agentNames, bodies));
+      win.document.close();
+      await waitForImages(win);
+      win.focus();
+      win.print();
+    } catch (err) {
+      win.document.body.textContent = `Could not build the transcript: ${(err as Error).message}`;
+    }
+  })();
+}
+
+/**
+ * Resolves once every image has settled, so responses that embed one don't
+ * print as blank boxes. Gives up after 5s rather than blocking the export.
+ */
+function waitForImages(win: Window): Promise<void> {
+  const images = Array.from(win.document.images).filter((img) => !img.complete);
+  if (images.length === 0) return new Promise((resolve) => setTimeout(resolve, 50));
+
+  return new Promise((resolve) => {
+    let remaining = images.length;
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const tick = () => { if (--remaining <= 0) finish(); };
+
+    for (const img of images) {
+      img.addEventListener("load", tick, { once: true });
+      img.addEventListener("error", tick, { once: true });
+    }
+    setTimeout(finish, 5000);
   });
 }

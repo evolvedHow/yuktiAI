@@ -13,6 +13,31 @@ html, body, #root {
   padding: 0;
 }
 
+/* ── Markdown bodies ────────────────────────────────────────────────────────
+   Everything else is set on the components in Markdown.tsx. These two rules
+   need a descendant selector, which the component API can't express. */
+
+/* Fenced blocks own their background — strip the inline-code chrome inside. */
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* Blinking caret while a turn is still being typed out. Attaching it to the
+   last block keeps it on the same line as the text, wherever that ends. */
+.markdown-body.is-streaming > *:last-child::after {
+  content: "▌";
+  margin-left: 1px;
+  opacity: 0.65;
+  animation: yukti-caret 1.05s step-end infinite;
+}
+
+@keyframes yukti-caret {
+  0%, 100% { opacity: 0.65; }
+  50%      { opacity: 0; }
+}
+
 /* Smooth scrollbar for transcript */
 .overflow-y-auto {
   scrollbar-width: thin;

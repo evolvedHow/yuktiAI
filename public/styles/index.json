@@ -5,13 +5,13 @@
     "file": null
   },
   {
-    "id": "hinglish",
-    "label": "Hinglish",
-    "file": "hinglish.md"
+    "id": "legal",
+    "label": "Legal",
+    "file": "legalese.md"
   },
   {
-    "id": "tanglish",
-    "label": "Tanglish",
-    "file": "tanglish.md"
+    "id": "colloquial",
+    "label": "Colloquial",
+    "file": "colloquial.md"
   }
 ]

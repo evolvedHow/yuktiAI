@@ -3,24 +3,30 @@
  *   - YuktiAI branding
  *   - Topic-file dropdown (select which .yml file to load)
  *   - Topic list (scrollable)
+ *   - Custom topic entry option
  *   - Audience controls (pinned to bottom)
  *   - On mobile: becomes a slide-in drawer triggered by a hamburger button
  */
 import { useState } from "react";
-import { DebateStatus, DebateStyle, Topic, TopicFileEntry } from "../types";
+import { DebateStatus, DebateStyle, resolveRegister, Topic, TopicFileEntry } from "../types";
 import { AudienceControls } from "./AudienceControls";
+// CustomTopicModal is handled by parent App
 
 interface Props {
   topicFiles: TopicFileEntry[];
   selectedTopicFile: TopicFileEntry | null;
   onSelectTopicFile: (file: string) => void;
   topics: Topic[];
+  /** Manually entered topics, persisted in this browser. */
+  customTopics: Topic[];
+  onRemoveCustomTopic: (id: string) => void;
   activeTopic: Topic | null;
   status: DebateStatus;
   onSelectTopic: (topic: Topic) => void;
   onAsk: (question: string) => void;
   onConclude: () => void;
   onOpenSettings: () => void;
+  onOpenCustomTopic: () => void;
   debateStyles: DebateStyle[];
   activeStyle: DebateStyle;
   onSelectStyle: (style: DebateStyle) => void;
@@ -31,12 +37,15 @@ export function Sidebar({
   selectedTopicFile,
   onSelectTopicFile,
   topics,
+  customTopics,
+  onRemoveCustomTopic,
   activeTopic,
   status,
   onSelectTopic,
   onAsk,
   onConclude,
   onOpenSettings,
+  onOpenCustomTopic,
   debateStyles,
   activeStyle,
   onSelectStyle,
@@ -106,42 +115,70 @@ export function Sidebar({
 
       {/* Topic list */}
       <div className="flex-1 overflow-y-auto px-3 pb-2">
+        {/* Custom topic entry */}
+        <button
+          onClick={() => {
+            setDrawerOpen(false);
+            onOpenCustomTopic();
+          }}
+          className="w-full text-left rounded-lg px-3 py-2.5 mb-3 text-sm transition-colors border border-dashed border-border hover:border-moderator-avatar/40"
+          title="Enter your own debate topic"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📝</span>
+            <span className="font-medium text-ink/80">Custom Topic</span>
+          </div>
+          <span className="block text-[10px] mt-1 text-muted/60">Type any topic to debate</span>
+        </button>
+
+        {/* Previously entered topics */}
+        {customTopics.length > 0 && (
+          <>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted px-2 mb-2">
+              Your Topics
+            </p>
+            <ul className="space-y-0.5 mb-3">
+              {customTopics.map((topic) => (
+                <li key={topic.id} className="group/row relative">
+                  <TopicButton
+                    topic={topic}
+                    isActive={activeTopic?.id === topic.id}
+                    onSelect={() => {
+                      onSelectTopic(topic);
+                      setDrawerOpen(false);
+                    }}
+                  />
+                  <button
+                    onClick={() => onRemoveCustomTopic(topic.id)}
+                    className="absolute top-1.5 right-1.5 opacity-0 group-hover/row:opacity-100 focus:opacity-100 text-muted hover:text-red-600 text-xs w-5 h-5 rounded flex items-center justify-center hover:bg-white transition-opacity"
+                    title="Remove from this list"
+                    aria-label={`Remove ${topic.title}`}
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {/* Topics from the selected .yml file */}
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted px-2 mb-2">
           {selectedTopicFile?.label ?? "Topics"}
         </p>
         <ul className="space-y-0.5">
-          {topics.map((topic) => {
-            const isActive = activeTopic?.id === topic.id;
-            return (
-              <li key={topic.id}>
-                <button
-                  onClick={() => {
-                    onSelectTopic(topic);
-                    setDrawerOpen(false);
-                  }}
-                  className={[
-                    "w-full text-left rounded-lg px-3 py-2.5 text-sm transition-colors group",
-                    isActive
-                      ? "bg-moderator-bg text-moderator-text font-medium"
-                      : "text-ink hover:bg-white",
-                  ].join(" ")}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  <span className="block leading-snug">{topic.title}</span>
-                  {topic.description && (
-                    <span
-                      className={[
-                        "block text-[11px] mt-0.5 line-clamp-2 leading-relaxed",
-                        isActive ? "text-moderator-text/70" : "text-muted group-hover:text-ink/60",
-                      ].join(" ")}
-                    >
-                      {topic.description}
-                    </span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
+          {topics.map((topic) => (
+            <li key={topic.id}>
+              <TopicButton
+                topic={topic}
+                isActive={activeTopic?.id === topic.id}
+                onSelect={() => {
+                  onSelectTopic(topic);
+                  setDrawerOpen(false);
+                }}
+              />
+            </li>
+          ))}
         </ul>
       </div>
 
@@ -190,6 +227,63 @@ export function Sidebar({
         </>
       )}
     </>
+  );
+}
+
+// ── Topic row (shared by file topics and manually entered ones) ───────────────
+
+function TopicButton({
+  topic, isActive, onSelect,
+}: {
+  topic: Topic;
+  isActive: boolean;
+  onSelect: () => void;
+}) {
+  const register = resolveRegister(topic.register);
+  return (
+    <button
+      onClick={onSelect}
+      className={[
+        "w-full text-left rounded-lg px-3 py-2.5 pr-7 text-sm transition-colors group",
+        isActive
+          ? "bg-moderator-bg text-moderator-text font-medium"
+          : "text-ink hover:bg-white",
+      ].join(" ")}
+      aria-current={isActive ? "page" : undefined}
+    >
+      <span className="flex items-center gap-1.5 leading-snug">
+        <span className="min-w-0">{topic.title}</span>
+        <RegisterBadge register={register} />
+      </span>
+      {topic.description && (
+        <span
+          className={[
+            "block text-[11px] mt-0.5 line-clamp-2 leading-relaxed",
+            isActive ? "text-moderator-text/70" : "text-muted group-hover:text-ink/60",
+          ].join(" ")}
+        >
+          {topic.description}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** Pill showing how a topic will be fought (SERIOUS / FRIVOLOUS). */
+function RegisterBadge({ register }: { register: "serious" | "frivolous" }) {
+  return (
+    <span
+      title={register === "frivolous" ? "Playful — comedy licence, no real stakes" : "Real stakes — sincere, evidence-facing"}
+      className={[
+        "shrink-0 inline-block text-[9px] font-semibold uppercase tracking-wider",
+        "px-1.5 py-0.5 rounded-full border leading-none",
+        register === "frivolous"
+          ? "border-amber-300 bg-amber-50 text-amber-700"
+          : "border-slate-300 bg-white text-slate-600",
+      ].join(" ")}
+    >
+      {register === "frivolous" ? "Playful" : "Serious"}
+    </span>
   );
 }
 

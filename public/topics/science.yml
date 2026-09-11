@@ -32,6 +32,7 @@ agents:
 
 topics:
   - id: nuclear_energy
+    register: serious
     title: "Nuclear Energy as a Climate Solution"
     description: >
       Should nuclear power be central to decarbonising the global electricity
@@ -39,6 +40,7 @@ topics:
       comparison with solar and wind at scale.
 
   - id: gene_editing
+    register: serious
     title: "Germline Gene Editing in Humans"
     description: >
       Should CRISPR-based germline editing of human embryos be permitted for
@@ -46,6 +48,7 @@ topics:
       and the line between treatment and enhancement.
 
   - id: animal_testing
+    register: serious
     title: "Animal Testing in Biomedical Research"
     description: >
       Is animal experimentation still a necessary and ethical component of
@@ -54,6 +57,7 @@ topics:
       and moral status of animals.
 
   - id: space_colonisation
+    register: serious
     title: "Prioritising Space Colonisation vs. Earth Problems"
     description: >
       Should humanity direct major resources toward establishing off-world
@@ -61,6 +65,7 @@ topics:
       from solvable problems on Earth?
 
   - id: consciousness
+    register: serious
     title: "The Hard Problem of Consciousness: Physicalism vs. Dualism"
     description: >
       Can subjective experience be fully explained by physical brain processes,

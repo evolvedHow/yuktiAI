@@ -1,0 +1,21 @@
+# Local-only secrets for `wrangler dev`. Copy to .dev.vars (git-ignored).
+# In production these are set with:  npx wrangler secret put <NAME>
+
+# ── Provider keys ─────────────────────────────────────────────────────────────
+# One per provider profile. The name is KEY_ + the profile id, uppercased with
+# non-alphanumerics replaced by "_". Set only the ones you actually use —
+# providers without a key simply show as "bring your own key" in the app.
+KEY_GROQ=
+# KEY_OPENAI=
+# KEY_ANTHROPIC=
+# KEY_OPENROUTER=
+# KEY_TOGETHER=
+# KEY_CEREBRAS=
+
+# ── Optional: shared access passcode ──────────────────────────────────────────
+# When set, the app must send a matching passcode before the gateway will spend
+# any server-held key. Leave unset for an open (unauthenticated) gateway.
+# ACCESS_PASSCODE=
+
+# ── Optional: per-profile base URL override ───────────────────────────────────
+# BASE_URL_GROQ=https://api.groq.com/openai/v1

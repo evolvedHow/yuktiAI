@@ -32,6 +32,7 @@ agents:
 
 topics:
   - id: electoral_reform
+    register: serious
     title: "First-Past-the-Post vs. Proportional Representation"
     description: >
       Should democracies replace winner-takes-all electoral systems with proportional
@@ -39,6 +40,7 @@ topics:
       engagement, and the mechanics of government formation.
 
   - id: term_limits
+    register: serious
     title: "Mandatory Term Limits for Elected Officials"
     description: >
       Should legislatures impose term limits on elected representatives to reduce
@@ -46,6 +48,7 @@ topics:
       democratic accountability make them unnecessary and counterproductive?
 
   - id: federalism
+    register: serious
     title: "Centralisation vs. Federalism"
     description: >
       Should power be concentrated at the national level for efficiency and
@@ -53,6 +56,7 @@ topics:
       experimentation? Debate covers equity, accountability, and policy coordination.
 
   - id: campaign_finance
+    register: serious
     title: "Public Financing of Political Campaigns"
     description: >
       Should election campaigns be funded entirely by the state to reduce the
@@ -60,6 +64,7 @@ topics:
       and restrict political speech?
 
   - id: judicial_independence
+    register: serious
     title: "Elected vs. Appointed Judges"
     description: >
       Should judges be elected by the public for democratic accountability, or

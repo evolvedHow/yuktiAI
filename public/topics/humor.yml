@@ -32,6 +32,7 @@ agents:
 
 topics:
   - id: cats_vs_dogs
+    register: frivolous
     title: "Cats vs. Dogs: The Eternal Pet Debate"
     description: >
       Are cats the superior companion animal, or do dogs rightfully hold the title
@@ -39,6 +40,7 @@ topics:
       and the eternal mystery of the 3 AM zoomies.
 
   - id: pineapple_pizza
+    register: frivolous
     title: "Pineapple on Pizza: Culinary Genius or Unforgivable Crime?"
     description: >
       Does the sweet-salty pairing of pineapple and pizza represent innovative
@@ -46,6 +48,7 @@ topics:
       most divisive topping gets its day in court.
 
   - id: tabs_vs_spaces
+    register: frivolous
     title: "Tabs vs. Spaces: The Developer's Eternal Schism"
     description: >
       Two tribes, one codebase, zero compromise. Is the tab the rational choice
@@ -53,12 +56,14 @@ topics:
       to visual consistency?
 
   - id: morning_vs_night
+    register: frivolous
     title: "Morning People vs. Night Owls: Who Really Runs the World?"
     description: >
       Are early risers the disciplined architects of productivity, or are night owls
       the true creative force quietly keeping civilization alive past midnight?
 
   - id: dosa_vs_idli_humor
+    register: frivolous
     title: "Dosas vs. Idlis: The Breakfast Civil War"
     description: >
       South India's fiercest rivalry, decided at last. Team Crispy vs. Team Fluffy.

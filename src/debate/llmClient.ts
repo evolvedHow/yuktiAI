@@ -2,7 +2,8 @@
  * Thin streaming wrapper around any OpenAI-compatible chat-completions endpoint.
  *
  * Works in the browser via fetch + ReadableStream — no SDK dependency needed.
- * Supported providers: Groq, OpenAI, OpenRouter, Together AI, local Ollama, etc.
+ * Talks to providers directly (Groq, OpenAI, OpenRouter, Together AI, local
+ * Ollama, …) or to the YuktiAI gateway, which speaks the same wire format.
  */
 
 export interface ChatMessage {
@@ -10,40 +11,51 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ChatRequest {
+  /** Base URL ending at the version segment, no trailing slash. */
+  baseUrl: string;
+  /** Sent as `Authorization: Bearer`. Empty when the gateway holds the key. */
+  apiKey: string;
+  model: string;
+  messages: ChatMessage[];
+  maxTokens: number;
+  /** Defaults to 0.82. The fact-checker uses 0 — a reviewer shouldn't improvise. */
+  temperature?: number;
+  /** Extra headers — used for the gateway's provider/passcode selection. */
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+}
+
 /**
  * Async-generator that yields individual text tokens as they arrive.
- * Throws on network errors or non-2xx HTTP responses.
+ * Throws on network errors, non-2xx responses, or an error event in the stream.
  */
-export async function* streamChat(
-  baseUrl: string,
-  apiKey: string,
-  model: string,
-  messages: ChatMessage[],
-  maxTokens: number,
-  signal?: AbortSignal,
-): AsyncGenerator<string> {
-  const res = await fetch(`${baseUrl}/chat/completions`, {
+export async function* streamChat(req: ChatRequest): AsyncGenerator<string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    // OpenRouter requires these; harmless elsewhere.
+    "HTTP-Referer": window.location.origin,
+    "X-Title": "YuktiAI Debate Arena",
+    ...req.headers,
+  };
+  if (req.apiKey) headers.Authorization = `Bearer ${req.apiKey}`;
+
+  const res = await fetch(`${req.baseUrl}/chat/completions`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      // OpenRouter requires this header
-      "HTTP-Referer": window.location.origin,
-      "X-Title": "YuktiAI Debate Arena",
-    },
+    headers,
     body: JSON.stringify({
-      model,
-      messages,
+      model: req.model,
+      messages: req.messages,
       stream: true,
-      max_tokens: maxTokens,
-      temperature: 0.82,
+      max_tokens: req.maxTokens,
+      temperature: req.temperature ?? 0.82,
     }),
-    signal,
+    signal: req.signal,
   });
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`LLM API error ${res.status}: ${body}`);
+    throw new Error(`LLM API error ${res.status}: ${extractErrorMessage(body) || body}`);
   }
 
   const reader = res.body!.getReader();
@@ -66,16 +78,35 @@ export async function* streamChat(
         if (raw === "[DONE]") return;
         try {
           const json = JSON.parse(raw) as {
-            choices: { delta: { content?: string } }[];
+            choices?: { delta?: { content?: string } }[];
+            error?: unknown;
           };
+          // A proxy that fails mid-stream reports it as an SSE error event
+          // rather than an HTTP status, since headers are already sent.
+          if (json.error) {
+            throw new Error(extractErrorMessage(raw) || "upstream stream error");
+          }
           const token = json.choices?.[0]?.delta?.content;
           if (token) yield token;
-        } catch {
-          // malformed SSE chunk — skip
+        } catch (err) {
+          // Re-throw our own error; ignore genuinely malformed SSE chunks.
+          if (err instanceof Error && !(err instanceof SyntaxError)) throw err;
         }
       }
     }
   } finally {
     reader.releaseLock();
   }
+}
+
+/** Pulls a human-readable message out of an OpenAI-style error payload. */
+function extractErrorMessage(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string } | string };
+    if (typeof parsed.error === "string") return parsed.error;
+    if (parsed.error?.message) return parsed.error.message;
+  } catch {
+    /* not JSON — fall through */
+  }
+  return "";
 }

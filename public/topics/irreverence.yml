@@ -32,6 +32,7 @@ agents:
 
 topics:
   - id: paper_plastic
+    register: frivolous
     title: "Paper vs. Plastic: The Great Bag Debate"
     description: >
       Which is the superior grocery bag material: the biodegradable, renewable paper
@@ -39,6 +40,7 @@ topics:
       and consumer guilt.
 
   - id: soccer_football
+    register: frivolous
     title: "Soccer vs. Football: The Global Game Debate"
     description: >
       Which is the superior sport: the world's game of soccer (football) or the
@@ -46,18 +48,21 @@ topics:
       fan passion.
 
   - id: batman_superman
+    register: frivolous
     title: "Batman vs. Superman: The Ultimate Superhero Showdown"
     description: >
       Who would win in a fight: the brooding, resourceful Batman or the godlike,
       virtuous Superman? A playful debate of power, morality, and comic-book lore.
 
   - id: dosa_iddlis
+    register: frivolous
     title: "Dosas vs. Idlis: The Ultimate South Indian Breakfast Debate"
     description: >
       Which is the superior South Indian breakfast dish: the crispy, savory dosa
       or the soft, steamed idli? A light-hearted battle of tradition, texture, and taste.
 
   - id: hot_dog_sandwich
+    register: frivolous
     title: "Is a Hot Dog a Sandwich?"
     description: >
       The question that has divided philosophers, food scientists, and people with

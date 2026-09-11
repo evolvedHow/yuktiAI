@@ -32,6 +32,7 @@ agents:
 
 topics:
   - id: ai_alignment
+    register: serious
     title: "AI Alignment: Existential Risk or Engineering Problem?"
     description: >
       Does the development of advanced AI systems pose a genuine civilisational-
@@ -40,6 +41,7 @@ topics:
       parallel with capability development?
 
   - id: social_media_harms
+    register: serious
     title: "Should Social Media Platforms Be Regulated as Utilities?"
     description: >
       Should dominant social media platforms be subject to common-carrier
@@ -48,6 +50,7 @@ topics:
       than the disease?
 
   - id: open_source_ai
+    register: serious
     title: "Open-Source AI Models: Democratisation or Dangerous Proliferation?"
     description: >
       Does releasing powerful AI model weights publicly accelerate beneficial
@@ -55,6 +58,7 @@ topics:
       malicious actors to deploy AI for cyberattacks, disinformation, and bioweapons?
 
   - id: surveillance_capitalism
+    register: serious
     title: "Surveillance Capitalism: Business Model or Societal Threat?"
     description: >
       Is the data-extraction model underlying Google, Meta, and similar platforms
@@ -62,6 +66,7 @@ topics:
       exploitative system that degrades privacy, democracy, and mental health?
 
   - id: crypto_decentralisation
+    register: serious
     title: "Cryptocurrency: Financial Revolution or Speculative Bubble?"
     description: >
       Does blockchain-based currency and decentralised finance represent a genuine

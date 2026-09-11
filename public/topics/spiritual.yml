@@ -33,6 +33,7 @@ agents:
 
 topics:
   - id: free_will
+    register: serious
     title: "Free Will vs. Determinism"
     description: >
       Do human beings possess genuine free will, or are our choices fully determined
@@ -40,6 +41,7 @@ topics:
       moral responsibility, and the implications for justice and spiritual practice.
 
   - id: afterlife
+    register: serious
     title: "Belief in an Afterlife: Comfort or Delusion?"
     description: >
       Does belief in an afterlife represent a profound spiritual truth, a healthy
@@ -47,6 +49,7 @@ topics:
       of this life? Covers near-death experiences, rebirth traditions, and secular humanism.
 
   - id: suffering
+    register: serious
     title: "The Purpose of Suffering"
     description: >
       Does human suffering serve a spiritual or moral function — refining the soul,
@@ -54,6 +57,7 @@ topics:
       of an indifferent universe that we are morally obligated to reduce?
 
   - id: meditation_science
+    register: serious
     title: "Meditation: Ancient Wisdom or Overhyped Wellness Trend?"
     description: >
       Does the scientific evidence support the transformative claims made for
@@ -61,6 +65,7 @@ topics:
       been watered down into productivity advice for stressed executives?
 
   - id: religion_morality
+    register: serious
     title: "Can Morality Exist Without Religion?"
     description: >
       Does a coherent, binding moral framework require a transcendent grounding

@@ -32,6 +32,7 @@ agents:
 
 topics:
   - id: colonialism_legacy
+    register: serious
     title: "Colonialism: Net Harm or Complex Legacy?"
     description: >
       Did European colonialism cause primarily catastrophic, lasting harm to
@@ -40,6 +41,7 @@ topics:
       Debate covers economic extraction, cultural destruction, and post-colonial theory.
 
   - id: partition_inevitability
+    register: serious
     title: "Was the Partition of India Inevitable?"
     description: >
       Given the political pressures of 1947, was the division of British India into
@@ -47,6 +49,7 @@ topics:
       paths that could have preserved a unified subcontinent?
 
   - id: empires_progress
+    register: serious
     title: "Did Great Empires Accelerate or Retard Human Progress?"
     description: >
       Did the Roman, Mughal, British, and other great empires — through trade,
@@ -54,6 +57,7 @@ topics:
       civilisation, or did their violence and extraction outweigh any benefits?
 
   - id: great_man_theory
+    register: serious
     title: "Great Man Theory: Do Individuals Shape History or Vice Versa?"
     description: >
       Are pivotal historical moments driven primarily by exceptional individual
@@ -61,6 +65,7 @@ topics:
       have found another vessel if they had not existed?
 
   - id: nuclear_hiroshima
+    register: serious
     title: "Were the Atomic Bombings of Hiroshima and Nagasaki Justified?"
     description: >
       Did the decision to use nuclear weapons against Japan in August 1945

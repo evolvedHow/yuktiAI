@@ -34,6 +34,7 @@ agents:
 
 topics:
   - id: ubi_socioeco
+    register: serious
     title: "Universal Basic Income: Emancipation or Dependency Trap?"
     description: >
       Would a UBI expand individual freedom and cushion automation's disruptions —
@@ -42,6 +43,7 @@ topics:
       distributional impact.
 
   - id: land_reform
+    register: serious
     title: "Land Reform: Equity Imperative or Economic Risk?"
     description: >
       Should governments pursue aggressive redistribution of land to address
@@ -49,6 +51,7 @@ topics:
       and productivity concerns make large-scale land reform counterproductive?
 
   - id: gig_economy
+    register: serious
     title: "The Gig Economy: Worker Liberation or Exploitation?"
     description: >
       Does platform-based gig work represent a flexible, autonomy-enabling form
@@ -56,6 +59,7 @@ topics:
       externalising risk onto workers without benefits or protections?
 
   - id: open_borders
+    register: serious
     title: "Open Borders: The World's Largest Anti-Poverty Programme?"
     description: >
       Would substantially open migration between nations be the single most
@@ -63,6 +67,7 @@ topics:
       fiscal, and social cohesion effects make this unworkable in practice?
 
   - id: wealth_tax
+    register: serious
     title: "Wealth Taxes: Corrective Justice or Capital Flight Risk?"
     description: >
       Should governments impose annual taxes on net wealth above a threshold

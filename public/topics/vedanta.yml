@@ -44,6 +44,7 @@ agents:
 
 topics:
   - id: brahman_only_real
+    register: serious
     title: "Is Brahman the Only Reality? Advaita vs. Dvaita"
     description: >
       Advaita Vedanta holds that only Brahman — pure, undivided consciousness —
@@ -53,6 +54,7 @@ topics:
       satisfying, and consistent with lived experience?
 
   - id: maya_illusion_or_power
+    register: serious
     title: "Maya: Cosmic Illusion or the Creative Power of Brahman?"
     description: >
       Is Maya a fundamental epistemic error — a veil that makes the unreal appear
@@ -61,6 +63,7 @@ topics:
       its suffering, and our moral obligations within it?
 
   - id: atman_brahman_identity
+    register: serious
     title: "Tat Tvam Asi: Is the Atman Truly Identical to Brahman?"
     description: >
       The Chandogya Upanishad declares 'That Thou Art' — the individual self is
@@ -70,6 +73,7 @@ topics:
       infinite and the other seems finite?
 
   - id: moksha_jnana_bhakti
+    register: serious
     title: "Moksha: Is Liberation Through Knowledge or Through Devotion?"
     description: >
       Advaita holds that Jnana — direct knowledge of one's identity with Brahman —
@@ -79,6 +83,7 @@ topics:
       conceptions of the liberated state?
 
   - id: brahman_consciousness_science
+    register: serious
     title: "Brahman as Pure Consciousness: Does Vedanta Solve the Hard Problem?"
     description: >
       Vedanta posits that consciousness (Chit) is not produced by the brain but is
@@ -88,6 +93,7 @@ topics:
       mystery without explaining it?
 
   - id: karma_free_will
+    register: serious
     title: "Karma and Free Will: Are They Compatible?"
     description: >
       If every action produces a corresponding karmic consequence that shapes
@@ -97,6 +103,7 @@ topics:
       appears to hold accountable?
 
   - id: creation_purpose
+    register: serious
     title: "Why Did Brahman Create the World? The Problem of Divine Play"
     description: >
       If Brahman is already perfect, complete, and blissfully self-sufficient,

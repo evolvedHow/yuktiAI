@@ -9,7 +9,12 @@
  * All LLM calls go through streamChat() — no server required.
  */
 import { streamChat, ChatMessage } from "./llmClient";
-import { AgentId, AgentNames, DEFAULT_AGENT_NAMES, DebateStyle, LLMSettings, Topic } from "../types";
+import {
+  AgentId, AgentNames, DEFAULT_AGENT_NAMES, DebateStyle, Finding, LLMSettings,
+  resolveRegister, ReviewState, Topic, TopicRegister, TurnReview,
+} from "../types";
+import { buildRedoInstruction, reviewTurn } from "./factCheck";
+import { resolveEndpoint } from "./gateway";
 import { getSessionStyle } from "./styles";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -37,9 +42,20 @@ export interface HistoryEntry {
 export interface OrchestratorCallbacks {
   onTurnStart: (agent: AgentId, turn: number) => void;
   onToken: (agent: AgentId, token: string, turn: number) => void;
-  onTurnEnd: (agent: AgentId, content: string, turn: number) => void;
+  /**
+   * May return a promise — the orchestrator awaits it before starting the next
+   * LLM call. That is what lets the typewriter reveal finish on screen before
+   * the following speaker begins.
+   */
+  onTurnEnd: (agent: AgentId, content: string, turn: number) => void | Promise<void>;
   /** Called just before the moderator's question-ack turn, with the question text */
   onQuestionAck: (question: string, turn: number) => void;
+  /** Fact-check stage changed for the turn in progress. */
+  onReviewStage?: (stage: ReviewState) => void;
+  /** The turn was rejected and is about to be re-delivered — clear the message. */
+  onTurnRedo?: (agent: AgentId, turn: number, attempt: number) => void;
+  /** Final review for the turn, once it has been accepted. */
+  onReview?: (agent: AgentId, turn: number, review: TurnReview) => void;
   onDone: () => void;
 }
 
@@ -78,11 +94,18 @@ function buildStyleBlock(style: DebateStyle, agentId: AgentId): string {
 
 // ── Message history builder ───────────────────────────────────────────────────
 
+/** Set on a redo so the model can see its rejected attempt and what to fix. */
+interface RedoContext {
+  previousAttempt: string;
+  instruction: string;
+}
+
 function buildMessages(
   history: HistoryEntry[],
   currentAgent: AgentId,
   systemPrompt: string,
   bootstrapPrompt?: string,
+  redo?: RedoContext,
 ): ChatMessage[] {
   const messages: ChatMessage[] = [{ role: "system", content: systemPrompt }];
 
@@ -105,65 +128,188 @@ function buildMessages(
     messages.push({ role: "user", content: "Please respond now." });
   }
 
+  // The rejected attempt never enters history — it only exists here, as the
+  // thing the correction refers to.
+  if (redo) {
+    messages.push({ role: "assistant", content: redo.previousAttempt });
+    messages.push({ role: "user", content: redo.instruction });
+  }
+
   return messages;
 }
 
 // ── Single-turn runner ────────────────────────────────────────────────────────
 
+/** Everything a turn needs that doesn't change between turns. */
+interface TurnDeps {
+  settings: LLMSettings;
+  callbacks: OrchestratorCallbacks;
+  control: OrchestratorControl;
+  /** Sourcing rules injected into every speaker's system prompt. */
+  evidencePolicy: string;
+  /** Reviewer system prompt. Empty disables claim review. */
+  checkerPersona: string;
+  /** Register guidance blocks, keyed by register (see public/agents/register-*.md). */
+  registerBlocks?: Partial<Record<TopicRegister, string>>;
+  agentNames: AgentNames;
+}
+
+/** Streams one attempt at a turn. Errors become visible text, not exceptions. */
+async function streamTurn(
+  agent: AgentId,
+  turn: number,
+  messages: ChatMessage[],
+  deps: TurnDeps,
+): Promise<string> {
+  const endpoint = resolveEndpoint(deps.settings);
+  let full = "";
+
+  try {
+    for await (const token of streamChat({
+      baseUrl: endpoint.baseUrl,
+      apiKey: endpoint.apiKey,
+      model: deps.settings.model,
+      messages,
+      maxTokens: deps.settings.maxTokensPerTurn,
+      headers: endpoint.headers,
+      signal: deps.control.signal,
+    })) {
+      full += token;
+      deps.callbacks.onToken(agent, token, turn);
+    }
+  } catch (err) {
+    if ((err as Error).name === "AbortError") throw err;
+    const msg = `[Error: ${(err as Error).message}]`;
+    full = msg;
+    deps.callbacks.onToken(agent, msg, turn);
+  }
+
+  // Awaited: the reveal animation must finish before anything else happens.
+  await deps.callbacks.onTurnEnd(agent, full, turn);
+  return full;
+}
+
+/**
+ * Delivers one turn, fact-checks it, and re-delivers it if the check rejects it.
+ *
+ * Only the accepted attempt enters the debate history, so a rejected statement
+ * never becomes something later speakers build on.
+ */
 async function runTurn(
   agent: AgentId,
   turn: number,
   persona: string,
   topic: Topic,
   history: HistoryEntry[],
-  settings: LLMSettings,
-  callbacks: OrchestratorCallbacks,
-  control: OrchestratorControl,
+  deps: TurnDeps,
   promptSuffix = "",
   bootstrapPrompt?: string,
   styleBlock = "",
 ): Promise<string> {
+  const { settings, callbacks, control } = deps;
+
+  // A topic that doesn't pick a register debates as serious.
+  const register = resolveRegister(topic.register);
+  const registerBlock =
+    register === "frivolous" ? deps.registerBlocks?.frivolous : deps.registerBlocks?.serious;
+
   const topicCtx =
     `\n\nDebate topic: **${topic.title}**\n` +
-    (topic.description ? `Context: ${topic.description}` : "");
+    (topic.description ? `Context: ${topic.description}` : "") +
+    `\nRegister: ${register.toUpperCase()} — this changes your tone, licence, and how strictly you will be fact-checked.`;
 
   const systemPrompt =
+    // Register licence goes first so a topic file's persona_overlay (fused into
+    // `persona`) is always the last word on voice — e.g. fdga.yml's explicit
+    // "strip all emotional adjectives" mandate overrides the generic SERIOUS
+    // block below.
+    (registerBlock ? `${registerBlock.trim()}\n\n---\n\n` : "") +
     persona.trim() +
     topicCtx +
+    (deps.evidencePolicy ? `\n\n---\n\n${deps.evidencePolicy.trim()}` : "") +
     (styleBlock ? styleBlock : "") +
     (promptSuffix ? `\n\n${promptSuffix}` : "");
 
-  const messages = buildMessages(history, agent, systemPrompt, bootstrapPrompt);
+  const maxRedos = Math.max(0, settings.factCheck.maxRedos);
+  const reviewEnabled = settings.factCheck.verifyLinks || settings.factCheck.reviewClaims;
 
-  callbacks.onTurnStart(agent, turn);
+  let attempt = 0;
+  let accepted = "";
+  let review: TurnReview | undefined;
+  let redo: RedoContext | undefined;
+  /** What superseded attempts were rejected for — kept for the audience. */
+  const corrected: Finding[] = [];
 
-  let full = "";
+  while (true) {
+    if (attempt === 0) callbacks.onTurnStart(agent, turn);
+    else callbacks.onTurnRedo?.(agent, turn, attempt);
 
-  try {
-    for await (const token of streamChat(
-      settings.baseUrl,
-      settings.apiKey,
-      settings.model,
-      messages,
-      settings.maxTokensPerTurn,
-      control.signal,
-    )) {
-      full += token;
-      callbacks.onToken(agent, token, turn);
-    }
-  } catch (err) {
-    if ((err as Error).name === "AbortError") throw err;
-    const msg = `[Error: ${(err as Error).message}]`;
-    full = msg;
-    callbacks.onToken(agent, msg, turn);
+    accepted = await streamTurn(
+      agent, turn,
+      buildMessages(history, agent, systemPrompt, bootstrapPrompt, redo),
+      deps,
+    );
+
+    // A failed call has nothing to check, and the reviewer would just object to
+    // the error text.
+    const errored = accepted.startsWith("[Error:");
+    if (!reviewEnabled || errored || !accepted.trim()) break;
+
+    // reviewTurn emits its own stages — "checking-links" only when the turn
+    // actually cited something, otherwise straight to "reviewing".
+    review = await reviewTurn(accepted, {
+      persona: deps.checkerPersona,
+      speaker: deps.agentNames[agent]?.name ?? agent,
+      topicTitle: topic.title,
+      register,
+      settings: {
+        ...settings,
+        // Claim review is off unless a checker persona actually loaded.
+        factCheck: {
+          ...settings.factCheck,
+          reviewClaims: settings.factCheck.reviewClaims && Boolean(deps.checkerPersona),
+        },
+      },
+      signal: control.signal,
+      onStage: (stage) => callbacks.onReviewStage?.(stage),
+    });
+    review.redos = attempt;
+
+    if (review.verdict !== "rejected" || attempt >= maxRedos) break;
+
+    callbacks.onReviewStage?.("redoing");
+    corrected.push(...review.findings.filter((f) => f.severity === "reject"));
+    redo = { previousAttempt: accepted, instruction: buildRedoInstruction(review.findings) };
+    attempt++;
   }
 
-  callbacks.onTurnEnd(agent, full, turn);
-  history.push({ agent, content: full });
-  return full;
+  callbacks.onReviewStage?.("done");
+  if (review) {
+    if (corrected.length > 0) review.corrected = corrected;
+    callbacks.onReview?.(agent, turn, review);
+  }
+
+  // A turn that errored or came back empty stays visible in the transcript but
+  // never enters the debate history — nothing for a later speaker to build on,
+  // and an error string ("[Error: …]") isn't a position to rebut.
+  if (!accepted.startsWith("[Error:") && accepted.trim()) {
+    history.push({ agent, content: accepted });
+  }
+  return accepted;
 }
 
 // ── Main orchestrator ─────────────────────────────────────────────────────────
+
+/** Optional prompts and metadata loaded from public/agents/. */
+export interface DebateExtras {
+  /** public/agents/evidence-policy.md — omitted when the setting is off. */
+  evidencePolicy?: string;
+  /** public/agents/factchecker.md — omitted disables claim review. */
+  checkerPersona?: string;
+  /** public/agents/register-serious.md + register-frivolous.md. */
+  registerBlocks?: Partial<Record<TopicRegister, string>>;
+  agentNames?: AgentNames;
+}
 
 export async function runDebate(
   topic: Topic,
@@ -172,16 +318,27 @@ export async function runDebate(
   callbacks: OrchestratorCallbacks,
   control: OrchestratorControl,
   activeStyle?: DebateStyle,
+  extras: DebateExtras = {},
 ): Promise<void> {
   const history: HistoryEntry[] = [];
   // Fall back to the session singleton if no style was passed explicitly
   const style = activeStyle ?? getSessionStyle();
 
+  const deps: TurnDeps = {
+    settings,
+    callbacks,
+    control,
+    evidencePolicy: settings.factCheck.evidencePolicy ? (extras.evidencePolicy ?? "") : "",
+    checkerPersona: extras.checkerPersona ?? "",
+    registerBlocks: extras.registerBlocks,
+    agentNames: extras.agentNames ?? DEFAULT_AGENT_NAMES,
+  };
+
   let turn = 0;
 
   // ── Turn 0: Moderator opening ────────────────────────────────────────────
   await runTurn(
-    "moderator", turn, personas.moderator, topic, history, settings, callbacks, control,
+    "moderator", turn, personas.moderator, topic, history, deps,
     "",
     `Please open the debate on the following topic:\n\n**${topic.title}**\n\n${topic.description}`,
     buildStyleBlock(style, "moderator"),
@@ -196,21 +353,20 @@ export async function runDebate(
     const agentId = CYCLE[(turn - 1) % 3];
     let suffix = "";
 
-    // Inject pending audience question on moderator's turn
+    // Inject pending audience question on moderator's turn. Taken once, so it
+    // is consumed whether it becomes a question turn or gets folded into a
+    // conclusion below.
     const pendingQ = agentId === "moderator" ? control.takePendingQuestion() : null;
-    if (pendingQ) {
-      callbacks.onQuestionAck(pendingQ, turn);
-      suffix =
-        `An audience member has submitted this question:\n\n"${pendingQ}"\n\n` +
-        `Please acknowledge this question, explain its relevance to the debate, ` +
-        `and invite both the Advocate and the Critic to respond.`;
-    }
 
-    // Conclusion on moderator's turn
+    // Conclusion on moderator's turn. A question asked in the final stretch is
+    // folded into the closing rather than dropped mid-conversation.
     if (agentId === "moderator" && control.shouldConclude()) {
+      const concludePrompt = pendingQ
+        ? `${CONCLUSION_PROMPT}\n\nAn audience question was asked in the closing stretch:\n"${pendingQ}"\nAcknowledge it briefly and address it where it fits in the closing.`
+        : CONCLUSION_PROMPT;
       await runTurn(
-        "moderator", turn, personas.moderator, topic, history, settings, callbacks, control,
-        CONCLUSION_PROMPT,
+        "moderator", turn, personas.moderator, topic, history, deps,
+        concludePrompt,
         undefined,
         buildStyleBlock(style, "moderator"),
       );
@@ -219,8 +375,16 @@ export async function runDebate(
       break;
     }
 
+    if (pendingQ) {
+      callbacks.onQuestionAck(pendingQ, turn);
+      suffix =
+        `An audience member has submitted this question:\n\n"${pendingQ}"\n\n` +
+        `Please acknowledge this question, explain its relevance to the debate, ` +
+        `and invite both the Advocate and the Critic to respond.`;
+    }
+
     await runTurn(
-      agentId, turn, personas[agentId], topic, history, settings, callbacks, control,
+      agentId, turn, personas[agentId], topic, history, deps,
       suffix,
       undefined,
       buildStyleBlock(style, agentId),
@@ -233,7 +397,7 @@ export async function runDebate(
   // Auto-close if max_turns hit
   if (!concluded) {
     await runTurn(
-      "moderator", turn, personas.moderator, topic, history, settings, callbacks, control,
+      "moderator", turn, personas.moderator, topic, history, deps,
       `We have reached the end of our allotted debate time.\n\n${CONCLUSION_PROMPT}`,
       undefined,
       buildStyleBlock(style, "moderator"),
@@ -247,9 +411,17 @@ export async function runDebate(
 // Agent names are defined solely in the topics .yml files.
 // The .md files contain only the system-prompt body — no frontmatter.
 
-export async function loadPersonas(
-  basePath: string,
-): Promise<{ personas: Record<AgentId, string>; agentNames: AgentNames }> {
+export async function loadPersonas(basePath: string): Promise<{
+  personas: Record<AgentId, string>;
+  agentNames: AgentNames;
+  /** Sourcing rules appended to every speaker's prompt. */
+  evidencePolicy: string;
+  /** Reviewer prompt. Empty string when the file is absent — claim review is
+   *  then skipped rather than run with an improvised prompt. */
+  checkerPersona: string;
+  /** Register guidance blocks (public/agents/register-*.md). */
+  registerBlocks: Partial<Record<TopicRegister, string>>;
+}> {
   const agents: AgentId[] = ["moderator", "advocate", "critic"];
   const results = await Promise.all(
     agents.map(async (id) => {
@@ -264,8 +436,28 @@ export async function loadPersonas(
     personas[id] = body;
   }
 
+  // Optional — a deployment that removes these files just loses the feature.
+  const [evidencePolicy, checkerPersona, registerSerious, registerFrivolous] = await Promise.all([
+    fetchOptional(`${basePath}/agents/evidence-policy.md`),
+    fetchOptional(`${basePath}/agents/factchecker.md`),
+    fetchOptional(`${basePath}/agents/register-serious.md`),
+    fetchOptional(`${basePath}/agents/register-frivolous.md`),
+  ]);
+
   return {
     personas: personas as Record<AgentId, string>,
     agentNames: { ...DEFAULT_AGENT_NAMES },
+    evidencePolicy,
+    checkerPersona,
+    registerBlocks: { serious: registerSerious, frivolous: registerFrivolous },
   };
+}
+
+async function fetchOptional(url: string): Promise<string> {
+  try {
+    const res = await fetch(url);
+    return res.ok ? await res.text() : "";
+  } catch {
+    return "";
+  }
 }

@@ -31,6 +31,7 @@ agents:
 
 topics:
   - id: cricket_football_global
+    register: frivolous
     title: "Cricket vs. Football: Which Sport Deserves the Title 'World's Game'?"
     description: >
       Football claims the largest global following; cricket commands some of the
@@ -38,6 +39,7 @@ topics:
       skill, strategic depth, and universal appeal?
 
   - id: ipl_test_cricket
+    register: frivolous
     title: "T20 vs. Test Cricket: Which Format Defines the Game?"
     description: >
       Has the IPL and T20 revolution elevated cricket to a global entertainment
@@ -45,6 +47,7 @@ topics:
       cricket the sport's highest form?
 
   - id: sports_money
+    register: serious
     title: "Are Elite Athletes Overpaid?"
     description: >
       Do the salaries of top athletes reflect genuine market value and the
@@ -52,6 +55,7 @@ topics:
       stars and other skilled professionals a symptom of misaligned societal values?
 
   - id: home_advantage
+    register: frivolous
     title: "Home Advantage: Psychological Edge or Structural Unfairness?"
     description: >
       Does the statistical reality of home advantage reflect the legitimate power
@@ -59,6 +63,7 @@ topics:
       bias that undermines competitive integrity?
 
   - id: technology_sports
+    register: serious
     title: "Technology in Sport: Enhancing Fairness or Killing the Moment?"
     description: >
       Has the introduction of VAR, Hawk-Eye, DRS, and other officiating technologies

@@ -3,3 +3,10 @@ dist/
 .env
 .env.local
 .env.*.local
+
+# Cloudflare Worker
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+worker/worker-configuration.d.ts
