@@ -51,6 +51,21 @@ is forwarded through the gateway and never stored server-side.
 Adding another key later needs no frontend change: set one more secret on the
 Worker (`wrangler secret put KEY_<PROVIDER>`) and it appears in the picker.
 
+### The Key Vault
+
+API keys, gateway credentials and models are edited behind a password-gated
+**🔑 Key Vault** (Settings → Key Vault). The vault password ships with the site
+in [`public/config/vault.yaml`](public/config/vault.yaml) — it's obfuscation
+against casual fiddling, not a hardened secret — and the whole vault can be
+disabled by emptying that password. Nothing entered there is sent anywhere
+except, at debate time, to the configured provider or gateway.
+
+**Starting a debate is blocked until an LLM is configured.** With no key or
+gateway URL, starting shows the precise fix required and the header keeps a
+persistent warning banner with a shortcut to the vault. The topic-review agent
+and claim-reviewer are gated the same way — no LLM call ever happens before keys
+exist.
+
 **One Worker serves every provider — there is no per-provider Worker.** The
 single Worker is selected by the `X-Yukti-Provider` header (or a `provider`
 field in the request body), and each provider's key is a separate secret named
@@ -124,7 +139,7 @@ No `VITE_BASE_PATH` needed — leave it blank or remove it.
 
 ## Topics
 
-Two ways to start a debate:
+Three ways to start a debate:
 
 **From the list** — topics live in `public/topics/*.yml`, grouped into sets that
 `public/topics/index.json` registers for the sidebar dropdown. Each entry needs:
@@ -134,21 +149,36 @@ topics:
   - id: unique_slug
     title: Display Name
     description: One-paragraph framing shown in the sidebar and injected into agent prompts.
-    register: serious   # or: frivolous
+    tone: serious        # or: jovial, informal
+    keywords: [elections, ai, regulation]   # optional — powers sidebar search
 ```
 
-**Register** — how the topic is fought. `serious` (the default when omitted) has
-real stakes and expects sincere, evidence-facing argument. `frivolous` is a
-playful register: comic exaggeration, theatrical bias and low-stakes trash-talk
-are the genre. The register also calibrates the fact-checker (see
-[Accuracy](#accuracy-fabricated-links-and-claims)), and is shown as a badge on
-each topic and in the debate header. A topic without a `register:` line is
-treated as `serious`.
+**Tone** — how the topic is fought, chosen per topic from radio buttons
+(**Serious / Jovial / Informal**) in the sidebar. `serious` (the default) has
+real stakes and expects sincere, evidence-facing argument. `jovial` (formerly
+called *frivolous* — the old key still works) is a playful register: comic
+exaggeration, theatrical bias and low-stakes trash-talk are the genre.
+`informal` is a relaxed, conversational register without the comedy licence.
+Tone calibrates the fact-checker (see
+[Accuracy](#accuracy-fabricated-links-and-claims)) and is shown as a badge on
+each topic and in the debate header. Stored tone lives per-browser in
+`yuktiai_topic_meta`, so changing it only affects this visitor — the `.yml` file
+is untouched.
 
-**Typed in** — the **📝 Custom Topic** button at the top of the sidebar takes any
-title and optional framing. Entered topics are saved to this browser under
-**Your Topics** (the twelve most recent) so they can be re-run, and removed with
-the ✕ on hover.
+**Typed in / edited** — the **📝 Add Topic** button opens the topic editor:
+title, description, optional search keywords, and a tone radio. Every topic —
+including ones that come from the `.yml` files — can be liked/disliked and shows
+small usage and vote counters under its title; managed topics can be edited (✎)
+or removed (✕) from the sidebar.
+
+**AI-reviewed** — new topics can be sent through the **topic-review agent**
+([`public/agents/topic-reviewer.md`](public/agents/topic-reviewer.md)), which
+sharpens the title, adds search keywords, and suggests a tone. The refined
+version is shown back and must be approved before saving — the agent edits the
+user's words, never silently replaces their intent. Auto-review on save (toggle
+in Settings → New Topics, default on) is skipped automatically until an LLM is
+configured; the ✨ Review &amp; refine button in the editor runs it on demand.
+Reviewed topics can be searched by their keywords in the sidebar search box.
 
 ---
 
@@ -237,13 +267,14 @@ something true — it is a smoke alarm, not proof. The transcript labels these
 "a model's judgement, not verified fact" for exactly that reason. Its own
 `verdict` field is ignored; severity is recomputed from the findings it returns.
 
-**Registers calibrate the smoke alarm.** How hard the reviewer throws a turn back
-depends on the debate's register ([see Topics](#topics)). In a `frivolous`
-debate, comic exaggeration and obviously-playful invention are the genre and are
-never flagged, and the reviewer's own `reject` findings are downgraded to
-`flag` — so a single joke cannot send a playful turn back for a rewrite. The one
-thing that stays a hard `reject` in both registers is a link measured as dead:
-fabricated URLs get a rewrite everywhere, even in a dosa vs. idli debate.
+**Tone calibrates the smoke alarm.** How hard the reviewer throws a turn back
+depends on the topic's tone ([see Topics](#topics)). In a `jovial` debate, comic
+exaggeration and obviously-playful invention are the genre and are never
+flagged, and the reviewer's own `reject` findings are downgraded to `flag` — so
+a single joke cannot send a playful turn back for a rewrite. `informal` debates
+relax the same way without the comedy licence. The one thing that stays a hard
+`reject` in every tone is a link measured as dead: fabricated URLs get a rewrite
+everywhere, even in a dosa vs. idli debate.
 
 ### The redo loop
 
@@ -314,9 +345,10 @@ Edit `public/agents/moderator.md`, `advocate.md`, or `critic.md`.
 
 Each file is a plain Markdown document injected verbatim as the agent's **system
 prompt**. The orchestrator appends the topic title and description automatically,
-plus the active topic's register guidance (`register-serious.md` /
-`register-frivolous.md`) and, when enabled, the evidence rules. Changes take
-effect immediately on the next debate start (no rebuild needed).
+plus the active topic's tone guidance (`register-serious.md` /
+`register-jovial.md` / `register-informal.md`) and, when enabled, the evidence
+rules. Changes take effect immediately on the next debate start (no rebuild
+needed).
 
 Guidelines:
 - Keep each persona under ~600 words to stay within model context limits.
@@ -329,11 +361,13 @@ Guidelines:
 - The file name (`moderator`, `advocate`, `critic`) is the only coupling — the
   display names ("Arya", "Priya", "Kiran") are set in `src/components/MessageCard.tsx`.
 
-`public/agents/register-serious.md` and `public/agents/register-frivolous.md`
-carry the per-register licence: which style of hyperbole is welcome and which
-line still must not be crossed. `evidence-policy.md` and `factchecker.md`
-calibrate the accuracy layers per register (see
-[Accuracy](#accuracy-fabricated-links-and-claims)).
+`public/agents/register-serious.md`, `register-jovial.md` and
+`register-informal.md` carry the per-tone licence: which style of hyperbole is
+welcome and which line still must not be crossed. `evidence-policy.md` and
+`factchecker.md` calibrate the accuracy layers per tone (see
+[Accuracy](#accuracy-fabricated-links-and-claims)), and
+`public/agents/topic-reviewer.md` powers the AI topic review (see
+[Topics](#topics)).
 
 ---
 
@@ -357,7 +391,7 @@ plus **Anthropic** and **Cerebras**. See
 ## Keyboard / UX Notes
 
 - **Enter** in the question field sends the question (Shift+Enter for newline).
-- **Esc** closes the Custom Topic dialog; clicking the backdrop closes either dialog.
+- **Esc** closes the topic editor and the Key Vault; clicking the backdrop closes either dialog.
 - The **Export PDF** button appears after the debate concludes.
 - Clicking a new topic mid-debate shows a confirmation prompt before stopping.
 - **Request Conclusion** flags the Moderator to wrap up on its next scheduled turn —

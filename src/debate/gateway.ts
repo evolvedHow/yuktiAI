@@ -78,28 +78,48 @@ export function describeConfigProblem(
   settings: LLMSettings,
   info: GatewayInfo | null,
 ): string | null {
-  if (!normalizeGatewayUrl(settings.backendUrl)) {
+  const gateway = normalizeGatewayUrl(settings.backendUrl);
+
+  if (!gateway) {
+    // Direct provider mode — the browser must hold a usable key.
     if (!settings.apiKey.trim()) {
-      return "No API key — open Settings and enter your key, or point YuktiAI at a gateway.";
+      return "No API key is configured. Open Settings → 🔑 Key Vault and paste a provider " +
+        "key (e.g. Groq), or point the Key Gateway at your Cloudflare Worker.";
+    }
+    if (!settings.baseUrl.trim()) {
+      return "The provider base URL is missing. In Settings → 🔑 Key Vault set an API base URL " +
+        "such as https://api.groq.com/openai/v1.";
+    }
+    if (!settings.model.trim()) {
+      return "No model name is set. In Settings → 🔑 Key Vault enter a model (e.g. llama-3.3-70b-versatile).";
     }
     return null;
   }
 
   if (settings.keySource === "own" && !settings.apiKey.trim()) {
-    return 'Settings is set to "use my own key" but no key is entered.';
+    return 'Settings is set to "use my own key" but no key is entered. Open Settings → 🔑 Key Vault and add it.';
   }
 
   if (info) {
     if (info.requiresPasscode && !settings.gatewayPasscode.trim()) {
-      return "This gateway requires a passcode — enter it in Settings.";
+      return "This gateway requires a passcode — enter it in Settings → 🔑 Key Vault.";
     }
     if (settings.keySource === "server") {
       const provider = info.providers.find((p) => p.id === settings.gatewayProviderId);
       if (provider && !provider.hasServerKey) {
-        return `The gateway has no pre-defined key for ${provider.label}. Pick another provider or switch to your own key in Settings.`;
+        return `The gateway has no pre-defined key for ${provider.label}. Pick another provider, or switch to your own key in Settings → 🔑 Key Vault.`;
       }
     }
   }
 
   return null;
+}
+
+/** How the app expects keys to be configured right now — for onboarding hints. */
+export function configModeLabel(settings: LLMSettings): string {
+  return normalizeGatewayUrl(settings.backendUrl)
+    ? "gateway"
+    : settings.apiKey.trim()
+      ? "direct"
+      : "none";
 }

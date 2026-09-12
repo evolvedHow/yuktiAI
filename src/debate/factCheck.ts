@@ -21,7 +21,7 @@
 
 import {
   BAD_LINK_VERDICTS, Finding, FindingKind, FindingSeverity, LinkCheck,
-  LLMSettings, resolveRegister, ReviewVerdict, TopicRegister, TurnReview,
+  LLMSettings, resolveTone, ReviewVerdict, TopicTone, toneDef, TurnReview,
 } from "../types";
 import { streamChat } from "./llmClient";
 import { normalizeGatewayUrl, resolveEndpoint } from "./gateway";
@@ -164,20 +164,22 @@ async function reviewClaims(
   topicTitle: string,
   statement: string,
   linkSummary: string,
-  register: TopicRegister,
+  tone: TopicTone,
   settings: LLMSettings,
   signal?: AbortSignal,
 ): Promise<Finding[]> {
   const endpoint = resolveEndpoint(settings);
 
+  const toneGuidance: Record<TopicTone, string> = {
+    serious: "strict, evidence-facing scrutiny — invented figures, studies and quotations are serious failures.",
+    jovial: "playful comic debate — exaggerated figures and theatrical claims are part of the genre and must not be flagged; misrepresenting a real study still matters.",
+    informal: "relaxed conversational debate — casual framing is fine, but concrete claims presented as settled fact should still hold up.",
+  };
   const userMessage =
     `Debate topic: ${topicTitle}\n\n` +
     `Speaker under review: ${speaker}\n\n` +
-    `Debate register: ${register.toUpperCase()}` +
-    (register === "frivolous"
-      ? " — playful hyperbole and comic exaggeration are expected and must NOT be flagged; flag only a specific, credible-looking fabrication (a plausible statistic, a real-sounding study, a quotation) presented as genuine."
-      : " — serious register, apply your standards as written; provocative advocacy is not a violation, invented checkable specifics are.") +
-    `\n\nLink verification already performed over the network:\n${linkSummary}\n\n` +
+    `Debate tone: ${tone.toUpperCase()} — ${toneGuidance}\n\n` +
+    `Link verification already performed over the network:\n${linkSummary}\n\n` +
     `--- STATEMENT UNDER REVIEW ---\n${statement}\n--- END STATEMENT ---\n\n` +
     `Review the statement per your rules and reply with the JSON object only.`;
 
@@ -209,9 +211,9 @@ export interface ReviewContext {
   persona: string;
   speaker: string;
   topicTitle: string;
-  /** How strictly the reviewer may judge. Frivolous registers downgrade the
-   *  reviewer's veto so only a measured dead link can force a redo. */
-  register?: TopicRegister;
+  /** How strictly the reviewer may judge. In relaxed tones (jovial/informal) a
+   *  reviewer veto is downgraded so only a measured dead link can force a redo. */
+  tone?: TopicTone;
   settings: LLMSettings;
   signal?: AbortSignal;
   /** Called as each stage begins, for UI status. */
@@ -225,7 +227,8 @@ export interface ReviewContext {
  */
 export async function reviewTurn(statement: string, ctx: ReviewContext): Promise<TurnReview> {
   const { factCheck } = ctx.settings;
-  const register = resolveRegister(ctx.register);
+  const tone = resolveTone(ctx.tone);
+  const strict = toneDef(tone).strictFactCheck;
   let links: LinkCheck[] = [];
   let error: string | undefined;
 
@@ -249,7 +252,7 @@ export async function reviewTurn(statement: string, ctx: ReviewContext): Promise
           ctx.topicTitle,
           statement,
           describeLinksForModel(links),
-          register,
+          tone,
           ctx.settings,
           ctx.signal,
         )),
@@ -260,10 +263,10 @@ export async function reviewTurn(statement: string, ctx: ReviewContext): Promise
     }
   }
 
-  // In a frivolous debate the reviewer's word alone must not force a whole
-  // redo — comic exaggeration is the genre. The measured dead-link check is
-  // untouched, so fabricated URLs still get thrown back in every register.
-  if (register === "frivolous") {
+  // In a relaxed tone the reviewer's word alone must not force a whole redo —
+  // comic exaggeration or casual phrasing is the genre. The measured dead-link
+  // check is untouched, so fabricated URLs still get thrown back in every tone.
+  if (!strict) {
     findings = findings.map((f) =>
       f.kind !== "dead-link" && f.severity === "reject"
         ? { ...f, severity: "flag" as FindingSeverity }

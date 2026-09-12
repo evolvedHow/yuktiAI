@@ -16,11 +16,13 @@ interface Props {
   backendStatus: BackendStatus;
   onSave: (patch: Partial<LLMSettings>) => void;
   onClose: () => void;
+  /** Opens the password-gated Key Vault in front of this modal. */
+  onOpenVault: () => void;
 }
 
 type ProbeStatus = "idle" | "testing" | "ok" | "fail";
 
-export function SettingsModal({ settings, backendStatus, onSave, onClose }: Props) {
+export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpenVault }: Props) {
   const [draft, setDraft] = useState<LLMSettings>({ ...settings });
   const [probeStatus, setProbeStatus] = useState<ProbeStatus>("idle");
   const [info, setInfo] = useState<GatewayInfo | null>(null);
@@ -128,13 +130,22 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose }: Prop
         {/* Header */}
         <div className="sticky top-0 bg-white flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
           <h2 className="text-base font-semibold text-ink">Settings</h2>
-          <button
-            onClick={onClose}
-            className="text-muted hover:text-ink p-1 rounded"
-            aria-label="Close"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onOpenVault}
+              className="text-xs font-medium rounded-lg px-3 py-1.5 border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors"
+              title="The password-gated home of API keys and gateway credentials"
+            >
+              🔑 Key Vault
+            </button>
+            <button
+              onClick={onClose}
+              className="text-muted hover:text-ink p-1 rounded"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="px-6 py-5 space-y-5">
@@ -450,6 +461,25 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose }: Prop
                 </div>
               </Field>
             </div>
+          </div>
+
+          {/* ── New topic review ─────────────────────────────────────────── */}
+          <div className="border-t border-border pt-4">
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
+              New Topics
+            </p>
+
+            <Toggle
+              checked={draft.reviewNewTopics}
+              onChange={(v) => set("reviewNewTopics", v)}
+              title="Review new topics with AI"
+            >
+              When you save a new topic, its prompt is first passed through the topic-review
+              agent (public/agents/topic-reviewer.md), which sharpens the title, adds search
+              keywords, and suggests a tone. The result is shown back to you before anything is
+              saved — your intent is never silently replaced. Skipped automatically until an API
+              key is configured.
+            </Toggle>
           </div>
 
           {/* ── Response reveal ──────────────────────────────────────────── */}

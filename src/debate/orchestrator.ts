@@ -11,7 +11,7 @@
 import { streamChat, ChatMessage } from "./llmClient";
 import {
   AgentId, AgentNames, DEFAULT_AGENT_NAMES, DebateStyle, Finding, LLMSettings,
-  resolveRegister, ReviewState, Topic, TopicRegister, TurnReview,
+  resolveTone, ReviewState, Topic, TopicTone, toneDef, TurnReview,
 } from "../types";
 import { buildRedoInstruction, reviewTurn } from "./factCheck";
 import { resolveEndpoint } from "./gateway";
@@ -159,8 +159,8 @@ interface TurnDeps {
   evidencePolicy: string;
   /** Reviewer system prompt. Empty disables claim review. */
   checkerPersona: string;
-  /** Register guidance blocks, keyed by register (see public/agents/register-*.md). */
-  registerBlocks?: Partial<Record<TopicRegister, string>>;
+  /** Tone guidance blocks, keyed by tone id (see public/agents/register-*.md). */
+  registerBlocks?: Partial<Record<TopicTone, string>>;
   agentNames: AgentNames;
 }
 
@@ -218,22 +218,23 @@ async function runTurn(
 ): Promise<{ content: string; errored: boolean }> {
   const { settings, callbacks, control } = deps;
 
-  // A topic that doesn't pick a register debates as serious.
-  const register = resolveRegister(topic.register);
-  const registerBlock =
-    register === "frivolous" ? deps.registerBlocks?.frivolous : deps.registerBlocks?.serious;
+  // The active tone — a runtime choice, not baked into the topic. Anything
+  // unset or legacy resolves to a current tone via resolveTone().
+  const tone = resolveTone(topic.tone);
+  const toneInfo = toneDef(tone);
+  const toneBlock = deps.registerBlocks?.[tone];
 
   const topicCtx =
     `\n\nDebate topic: **${topic.title}**\n` +
     (topic.description ? `Context: ${topic.description}` : "") +
-    `\nRegister: ${register.toUpperCase()} — this changes your tone, licence, and how strictly you will be fact-checked.`;
+    `\nTone: ${toneInfo.label.toUpperCase()} — ${toneInfo.tagline} The tone sets how strictly the accuracy layers judge this debate.`;
 
   const systemPrompt =
-    // Register licence goes first so a topic file's persona_overlay (fused into
+    // Tone licence goes first so a topic file's persona_overlay (fused into
     // `persona`) is always the last word on voice — e.g. fdga.yml's explicit
     // "strip all emotional adjectives" mandate overrides the generic SERIOUS
     // block below.
-    (registerBlock ? `${registerBlock.trim()}\n\n---\n\n` : "") +
+    (toneBlock ? `${toneBlock.trim()}\n\n---\n\n` : "") +
     persona.trim() +
     topicCtx +
     (deps.evidencePolicy ? `\n\n---\n\n${deps.evidencePolicy.trim()}` : "") +
@@ -292,7 +293,7 @@ async function runTurn(
       persona: deps.checkerPersona,
       speaker: deps.agentNames[agent]?.name ?? agent,
       topicTitle: topic.title,
-      register,
+      tone,
       settings: {
         ...settings,
         // Claim review is off unless a checker persona actually loaded.
@@ -338,8 +339,8 @@ export interface DebateExtras {
   evidencePolicy?: string;
   /** public/agents/factchecker.md — omitted disables claim review. */
   checkerPersona?: string;
-  /** public/agents/register-serious.md + register-frivolous.md. */
-  registerBlocks?: Partial<Record<TopicRegister, string>>;
+  /** public/agents/register-<tone>.md — one block per tone id. */
+  registerBlocks?: Partial<Record<TopicTone, string>>;
   agentNames?: AgentNames;
 }
 
@@ -464,8 +465,8 @@ export async function loadPersonas(basePath: string): Promise<{
   /** Reviewer prompt. Empty string when the file is absent — claim review is
    *  then skipped rather than run with an improvised prompt. */
   checkerPersona: string;
-  /** Register guidance blocks (public/agents/register-*.md). */
-  registerBlocks: Partial<Record<TopicRegister, string>>;
+  /** Tone guidance blocks (public/agents/register-*.md), keyed by tone id. */
+  registerBlocks: Partial<Record<TopicTone, string>>;
 }> {
   const agents: AgentId[] = ["moderator", "advocate", "critic"];
   const results = await Promise.all(
@@ -482,10 +483,17 @@ export async function loadPersonas(basePath: string): Promise<{
   }
 
   // Optional — a deployment that removes these files just loses the feature.
-  const [evidencePolicy, checkerPersona, registerSerious, registerFrivolous] = await Promise.all([
+  // The legacy register-frivolous.md is kept as a fallback for the jovial tone
+  // so old deployments don't silently lose a block.
+  const [
+    evidencePolicy, checkerPersona, registerSerious, registerJovial,
+    registerInformal, registerFrivolous,
+  ] = await Promise.all([
     fetchOptional(`${basePath}/agents/evidence-policy.md`),
     fetchOptional(`${basePath}/agents/factchecker.md`),
     fetchOptional(`${basePath}/agents/register-serious.md`),
+    fetchOptional(`${basePath}/agents/register-jovial.md`),
+    fetchOptional(`${basePath}/agents/register-informal.md`),
     fetchOptional(`${basePath}/agents/register-frivolous.md`),
   ]);
 
@@ -494,7 +502,11 @@ export async function loadPersonas(basePath: string): Promise<{
     agentNames: { ...DEFAULT_AGENT_NAMES },
     evidencePolicy,
     checkerPersona,
-    registerBlocks: { serious: registerSerious, frivolous: registerFrivolous },
+    registerBlocks: {
+      serious: registerSerious,
+      jovial: registerJovial || registerFrivolous,
+      informal: registerInformal,
+    },
   };
 }
 

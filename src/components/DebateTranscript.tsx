@@ -3,7 +3,7 @@
  */
 import { useEffect, useRef } from "react";
 import {
-  AgentNames, DebateStatus, GateState, Message, resolveRegister, ReviewState, Topic,
+  AgentNames, DebateStatus, GateState, Message, resolveTone, ReviewState, Topic, TONE_DEFS,
 } from "../types";
 import { MessageCard } from "./MessageCard";
 import { TurnGate } from "./TurnGate";
@@ -32,19 +32,23 @@ const REVIEW_LABEL: Partial<Record<ReviewState, string>> = {
   retrying: "Connection failed — retrying…",
 };
 
-/** How this topic is being fought — serious argument or playful comedy. */
-function RegisterBadge({ register }: { register: "serious" | "frivolous" }) {
+/** How this topic is being fought — serious argument, playful comedy, or casual chat. */
+function ToneBadge({ tone }: { tone: Parameters<typeof resolveTone>[0] }) {
+  const def = TONE_DEFS.find((t) => t.id === resolveTone(tone)) ?? TONE_DEFS[0];
+  const cls = def.id === "serious"
+    ? "border-slate-300 bg-white text-slate-600"
+    : def.id === "jovial"
+      ? "border-amber-300 bg-amber-50 text-amber-700"
+      : "border-sky-300 bg-sky-50 text-sky-700";
   return (
     <span
-      title={register === "frivolous" ? "Playful register — comedy licence, low stakes" : "Serious register — real stakes, evidence-facing"}
+      title={def.tagline}
       className={[
         "text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border",
-        register === "frivolous"
-          ? "border-amber-300 bg-amber-50 text-amber-700"
-          : "border-slate-300 bg-white text-slate-600",
+        cls,
       ].join(" ")}
     >
-      {register === "frivolous" ? "Playful" : "Serious"}
+      {def.label}
     </span>
   );
 }
@@ -96,7 +100,7 @@ export function DebateTranscript({
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <RegisterBadge register={resolveRegister(topic.register)} />
+          <ToneBadge tone={topic.tone} />
           <span
             className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${badge[status].cls}`}
           >

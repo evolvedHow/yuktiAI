@@ -12,8 +12,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { load as yamlLoad } from "js-yaml";
 import {
   AgentId, AgentNames, DebateStatus, DebateStyle, DEFAULT_AGENT_NAMES,
-  DEFAULT_SETTINGS, GatewayInfo, GateState, LLMSettings, Message, ReviewState,
-  Topic, TopicFileContent, TopicFileEntry, TopicRegister, TurnReview,
+  DEFAULT_SETTINGS, GatewayInfo, GateState, LLMSettings, Message,
+  normalizeTopic, ReviewState, resolveTone, Topic, TopicFileContent, TopicFileEntry,
+  TopicMeta, TopicTone, TopicToneMap, TopicVote, TopicVoteMap, TurnReview,
 } from "../types";
 import { loadPersonas, runDebate } from "../debate/orchestrator";
 import {
@@ -21,6 +22,7 @@ import {
   fetchGatewayInfo,
   normalizeGatewayUrl,
 } from "../debate/gateway";
+import { reviewTopicPrompt, TopicReviewResult } from "../debate/topicReview";
 import { RevealQueue } from "../debate/typewriter";
 import {
   DEFAULT_ENGLISH_STYLE,
@@ -35,6 +37,10 @@ export type BackendStatus = "unknown" | "online" | "offline";
 const SETTINGS_KEY = "yuktiai_settings";
 const CUSTOM_TOPICS_KEY = "yuktiai_custom_topics";
 const MAX_SAVED_CUSTOM_TOPICS = 12;
+/** Per-topic counter/tone overrides, for both file and managed topics. */
+const TOPIC_META_KEY = "yuktiai_topic_meta";
+/** This browser's own like/dislike votes, so toggling works. */
+const TOPIC_VOTES_KEY = "yuktiai_topic_votes";
 
 function loadSettings(): LLMSettings {
   try {
@@ -67,9 +73,47 @@ function loadCustomTopics(): Topic[] {
       (t): t is Topic =>
         typeof t === "object" && t !== null &&
         typeof (t as Topic).id === "string" && typeof (t as Topic).title === "string",
-    );
+    ).map(normalizeTopic as (t: Topic) => Topic);
   } catch {
     return [];
+  }
+}
+
+function loadTopicMeta(): TopicToneMap {
+  try {
+    const raw = localStorage.getItem(TOPIC_META_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, TopicMeta | undefined>;
+    const out: TopicToneMap = {};
+    for (const [id, meta] of Object.entries(parsed)) {
+      if (!meta || typeof meta !== "object") continue;
+      out[id] = {
+        uses: Number(meta.uses) || 0,
+        likes: Number(meta.likes) || 0,
+        dislikes: Number(meta.dislikes) || 0,
+        tone: resolveTone(meta.tone),
+        lastUsedAt: typeof meta.lastUsedAt === "string" ? meta.lastUsedAt : undefined,
+      };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function loadTopicVotes(): TopicVoteMap {
+  try {
+    const raw = localStorage.getItem(TOPIC_VOTES_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: TopicVoteMap = {};
+    for (const [id, v] of Object.entries(parsed)) {
+      if (v === "like" || v === "dislike") out[id] = v;
+      else if (typeof v === "string") out[id] = null;
+    }
+    return out;
+  } catch {
+    return {};
   }
 }
 
@@ -100,6 +144,10 @@ export function useDebate() {
   const [debateStyles, setDebateStyles] = useState<DebateStyle[]>([DEFAULT_ENGLISH_STYLE]);
   const [activeStyle, setActiveStyleState] = useState<DebateStyle>(DEFAULT_ENGLISH_STYLE);
   const [customTopics, setCustomTopics] = useState<Topic[]>(loadCustomTopics);
+  /** Per-topic stats + tone override, merged over both file and managed topics. */
+  const [topicMeta, setTopicMetaState] = useState<TopicToneMap>(loadTopicMeta);
+  /** This browser's like/dislike votes (toggle semantics). */
+  const [topicVotes, setTopicVotesState] = useState<TopicVoteMap>(loadTopicVotes);
   /** true while buffered text is still being typed onto the screen. */
   const [revealing, setRevealing] = useState(false);
   /** Which fact-check stage the current turn is in, for the status strip. */
@@ -111,15 +159,45 @@ export function useDebate() {
   // Shared sourcing rules + fact-checker prompt from public/agents/
   const evidencePolicyRef = useRef("");
   const checkerPersonaRef = useRef("");
-  // Register guidance blocks (public/agents/register-*.md), injected per debate
-  const registerBlocksRef = useRef<Partial<Record<TopicRegister, string>>>({});
+  // Topic-review agent persona (public/agents/topic-reviewer.md)
+  const reviewerPersonaRef = useRef("");
+  // Tone guidance blocks (public/agents/register-*.md), injected per debate
+  const registerBlocksRef = useRef<Partial<Record<TopicTone, string>>>({});
   // Base agent names derived from persona .md files
   const baseAgentNamesRef = useRef<AgentNames>(DEFAULT_AGENT_NAMES);
+
+  // Refs mirroring topicMeta/topicVotes for synchronous reads inside callbacks.
+  const topicMetaRef = useRef<TopicToneMap>(loadTopicMeta());
+  const topicVotesRef = useRef<TopicVoteMap>(loadTopicVotes());
 
   // Refs for mutable orchestrator controls (no re-render needed)
   const pendingQRef = useRef<string | null>(null);
   const concludeFlagRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // ── Topic meta/vote persistence helpers (ref + state stay coherent) ────
+  const persistMeta = useCallback((next: TopicToneMap) => {
+    topicMetaRef.current = next;
+    setTopicMetaState(next);
+    localStorage.setItem(TOPIC_META_KEY, JSON.stringify(next));
+  }, []);
+
+  const patchMeta = useCallback((id: string, patch: Partial<TopicMeta>) => {
+    const prev = topicMetaRef.current[id] ?? {
+      uses: 0, likes: 0, dislikes: 0, tone: undefined, lastUsedAt: undefined,
+    } satisfies TopicMeta;
+    const next: TopicToneMap = {
+      ...topicMetaRef.current,
+      [id]: { ...prev, ...patch, likes: Math.max(0, prev.likes), dislikes: Math.max(0, prev.dislikes) },
+    };
+    persistMeta(next);
+  }, [persistMeta]);
+
+  const persistVotes = useCallback((next: TopicVoteMap) => {
+    topicVotesRef.current = next;
+    setTopicVotesState(next);
+    localStorage.setItem(TOPIC_VOTES_KEY, JSON.stringify(next));
+  }, []);
 
   // Active message id being streamed
   const activeIdRef = useRef<string | null>(null);
@@ -142,7 +220,9 @@ export function useDebate() {
         throw new Error("YAML file must have a 'topics' array");
       }
 
-      setTopics(parsed.topics);
+      // Fold legacy `register:` values and any stats the file ships with into
+      // the runtime Topic shape.
+      setTopics(parsed.topics.map(normalizeTopic));
 
       // Sync moderatorApplies from yml style_config into active style
       const moderatorApplies = parsed.style_config?.moderator_applies ?? true;
@@ -216,6 +296,12 @@ export function useDebate() {
         setAgentNames(names);
       })
       .catch(() => setError("Failed to load agent personas"));
+
+    // Topic-review agent (optional — absent file just disables the feature)
+    fetch(`${base}/agents/topic-reviewer.md`, { cache: "no-cache" })
+      .then((r) => (r.ok ? r.text() : ""))
+      .then((body) => { reviewerPersonaRef.current = body; })
+      .catch(() => { reviewerPersonaRef.current = ""; });
 
     // Load debate styles from public/styles/index.json + .md files
     loadStyles(base)
@@ -296,24 +382,111 @@ export function useDebate() {
     });
   }, []);
 
-  // ── Custom topics ────────────────────────────────────────────────────────
-  const addCustomTopic = useCallback((topic: Topic) => {
+  // ── Custom / managed topics ────────────────────────────────────────────────
+  const saveCustomTopics = useCallback((next: Topic[]) => {
+    localStorage.setItem(CUSTOM_TOPICS_KEY, JSON.stringify(next));
+  }, []);
+
+  /** Creates (or updates) a managed topic with sane defaults. */
+  const saveCustomTopic = useCallback((id: string, topic: Topic) => {
     setCustomTopics((prev) => {
-      const deduped = prev.filter(
-        (t) => t.title.trim().toLowerCase() !== topic.title.trim().toLowerCase(),
-      );
-      const next = [topic, ...deduped].slice(0, MAX_SAVED_CUSTOM_TOPICS);
-      localStorage.setItem(CUSTOM_TOPICS_KEY, JSON.stringify(next));
+      const exists = prev.some((t) => t.id === id);
+      const next = exists
+        ? prev.map((t) => (t.id === id ? topic : t))
+        : [topic, ...prev].slice(0, MAX_SAVED_CUSTOM_TOPICS);
+      saveCustomTopics(next);
       return next;
     });
-  }, []);
+  }, [saveCustomTopics]);
+
+  const addCustomTopic = useCallback((topic: Topic) => {
+    const normalized: Topic = normalizeTopic({
+      ...topic,
+      id: topic.id || `custom-${Date.now()}`,
+      source: "custom",
+    });
+    saveCustomTopic(normalized.id, normalized);
+    // Never lose a tone the user picked for a managed topic.
+    if (normalized.tone && normalizeTopic(topic).tone) {
+      patchMeta(normalized.id, { tone: normalized.tone });
+    }
+  }, [saveCustomTopic, patchMeta]);
+
+  /** Updates an existing managed topic. */
+  const updateCustomTopic = useCallback((id: string, patch: Partial<Topic>) => {
+    if (patch.tone) patchMeta(id, { tone: resolveTone(patch.tone) });
+    setCustomTopics((prev) => {
+      const next = prev.map((t) =>
+        t.id === id ? normalizeTopic({ ...t, ...patch, id }) : t,
+      );
+      saveCustomTopics(next);
+      return next;
+    });
+  }, [saveCustomTopics, patchMeta]);
 
   const removeCustomTopic = useCallback((id: string) => {
     setCustomTopics((prev) => {
       const next = prev.filter((t) => t.id !== id);
-      localStorage.setItem(CUSTOM_TOPICS_KEY, JSON.stringify(next));
+      saveCustomTopics(next);
       return next;
     });
+  }, [saveCustomTopics]);
+
+  /** Picks a tone for a topic (radio buttons in the sidebar). Stored in meta so
+   *  it applies to file topics too. */
+  const setTopicTone = useCallback((id: string, tone: TopicTone) => {
+    patchMeta(id, { tone: resolveTone(tone) });
+    setCustomTopics((prev) => {
+      const changed = prev.some((t) => t.id === id);
+      if (!changed) return prev;
+      const next = prev.map((t) => (t.id === id ? normalizeTopic({ ...t, tone }) : t));
+      saveCustomTopics(next);
+      return next;
+    });
+  }, [patchMeta, saveCustomTopics]);
+
+  /** Toggles this browser's like/dislike vote and adjusts the counters. */
+  const voteTopic = useCallback((id: string, vote: Exclude<TopicVote, null>) => {
+    const current = topicVotesRef.current[id] ?? null;
+    // Toggling the same vote off.
+    if (current === vote) {
+      const meta = topicMetaRef.current[id];
+      persistVotes({ ...topicVotesRef.current, [id]: null });
+      if (meta) {
+        patchMeta(id, {
+          likes: meta.likes + (vote === "like" ? -1 : 0),
+          dislikes: meta.dislikes + (vote === "dislike" ? -1 : 0),
+        });
+      }
+      return;
+    }
+    // Switching or casting a fresh vote.
+    const meta = topicMetaRef.current[id] ?? { uses: 0, likes: 0, dislikes: 0 };
+    persistVotes({ ...topicVotesRef.current, [id]: vote });
+    patchMeta(id, {
+      likes: meta.likes + (current === "like" ? -1 : 0) + (vote === "like" ? 1 : 0),
+      dislikes: meta.dislikes + (current === "dislike" ? -1 : 0) + (vote === "dislike" ? 1 : 0),
+    });
+  }, [persistVotes, patchMeta]);
+
+  /** Records that a debate ran on a topic. Increments the use counter. */
+  const recordTopicUse = useCallback((id: string) => {
+    const meta = topicMetaRef.current[id];
+    patchMeta(id, { uses: (meta?.uses ?? 0) + 1, lastUsedAt: new Date().toISOString() });
+  }, [patchMeta]);
+
+  /** Folds a topic's stored meta into the runtime Topic for display + debate. */
+  const effectiveTopic = useCallback((topic: Topic): Topic => {
+    const meta = topicMetaRef.current[topic.id];
+    if (!meta) return topic;
+    return {
+      ...topic,
+      tone: meta.tone ?? topic.tone,
+      uses: meta.uses ?? topic.uses ?? 0,
+      likes: meta.likes ?? topic.likes ?? 0,
+      dislikes: meta.dislikes ?? topic.dislikes ?? 0,
+      lastUsedAt: meta.lastUsedAt ?? topic.lastUsedAt,
+    };
   }, []);
 
   // ── Typewriter reveal ────────────────────────────────────────────────────
@@ -342,6 +515,9 @@ export function useDebate() {
       return;
     }
 
+    // Lock the tone/stat overlay into the topic that actually debates.
+    const effective = effectiveTopic(topic);
+
     // Live reachability check before committing to a debate: the config may
     // "look" valid while the gateway is actually down, and we'd rather refuse
     // to start than feed the audience a string of connection-error cards.
@@ -351,7 +527,7 @@ export function useDebate() {
         const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(4500) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       } catch {
-        setError(`Gateway unreachable at ${url}. Check the address in Settings, or switch to Direct mode.`);
+        setError(`Gateway unreachable at ${url}. Check the address in Settings → 🔑 Key Vault, or switch to Direct mode.`);
         return;
       }
     }
@@ -369,10 +545,13 @@ export function useDebate() {
     });
     setRevealing(false);
 
-    setActiveTopic(topic);
+    setActiveTopic(effective);
     setMessages([]);
     setStatus("active");
     setError(null);
+
+    // Requirement-level counter: a debate is being run on this topic.
+    recordTopicUse(effective.id);
 
     const control = {
       takePendingQuestion: () => {
@@ -489,7 +668,7 @@ export function useDebate() {
     // runDebate resolves the endpoint per call (direct provider vs. gateway) —
     // see resolveEndpoint in debate/gateway.ts.
     try {
-      await runDebate(topic, personas, settings, callbacks, control, getSessionStyle(), {
+      await runDebate(effective, personas, settings, callbacks, control, getSessionStyle(), {
         evidencePolicy: evidencePolicyRef.current,
         checkerPersona: checkerPersonaRef.current,
         registerBlocks: registerBlocksRef.current,
@@ -509,12 +688,37 @@ export function useDebate() {
       setReviewState("idle");
       setStatus("done");
     }
-  }, [settings, gatewayInfo, abandonReveal, agentNames]);
+  }, [settings, gatewayInfo, abandonReveal, agentNames, effectiveTopic, recordTopicUse]);
 
   // ── Audience controls ────────────────────────────────────────────────────
   const askQuestion = useCallback((question: string) => {
     pendingQRef.current = question.trim() || null;
   }, []);
+
+  // ── Topic-review agent ─────────────────────────────────────────────────
+  /**
+   * Runs the user's raw topic through the topic-review agent. Throws with an
+   * actionable message when the LLM is not configured (requirement: zero LLM
+   * calls happen before keys exist).
+   */
+  const reviewTopic = useCallback(async (title: string, description: string): Promise<TopicReviewResult> => {
+    const problem = describeConfigProblem(settings, gatewayInfo);
+    if (problem) {
+      throw new Error(
+        `Cannot review topics yet — ${problem}`,
+      );
+    }
+    if (!reviewerPersonaRef.current) {
+      throw new Error("The topic-reviewer persona (public/agents/topic-reviewer.md) is missing from this deployment.");
+    }
+    const result = await reviewTopicPrompt({
+      title,
+      description,
+      persona: reviewerPersonaRef.current,
+      settings,
+    });
+    return result;
+  }, [settings, gatewayInfo]);
 
   const requestConclusion = useCallback(() => {
     concludeFlagRef.current = true;
@@ -557,7 +761,13 @@ export function useDebate() {
     topics,
     customTopics,
     addCustomTopic,
+    updateCustomTopic,
     removeCustomTopic,
+    topicMeta,
+    topicVotes,
+    setTopicTone,
+    voteTopic,
+    reviewTopic,
     activeTopic,
     messages,
     status,

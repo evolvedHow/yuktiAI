@@ -2,15 +2,19 @@
  * Left sidebar:
  *   - YuktiAI branding
  *   - Topic-file dropdown (select which .yml file to load)
- *   - Topic list (scrollable)
+ *   - Search box over topics
+ *   - Topic list (scrollable) — each row shows a tone radio (Serious/Jovial/
+ *     Informal), usage & like/dislike stats, and edit/remove for managed topics
  *   - Custom topic entry option
  *   - Audience controls (pinned to bottom)
  *   - On mobile: becomes a slide-in drawer triggered by a hamburger button
  */
-import { useState } from "react";
-import { DebateStatus, DebateStyle, resolveRegister, Topic, TopicFileEntry } from "../types";
+import { useMemo, useState } from "react";
+import {
+  DebateStatus, DebateStyle, resolveTone, Topic, TopicFileEntry,
+  TopicTone, TopicToneMap, TopicVote, TopicVoteMap, TONE_DEFS,
+} from "../types";
 import { AudienceControls } from "./AudienceControls";
-// CustomTopicModal is handled by parent App
 
 interface Props {
   topicFiles: TopicFileEntry[];
@@ -19,6 +23,13 @@ interface Props {
   topics: Topic[];
   /** Manually entered topics, persisted in this browser. */
   customTopics: Topic[];
+  /** Per-topic stats + tone override (merged over file and managed topics). */
+  topicMeta: TopicToneMap;
+  /** This browser's own vote on each topic. */
+  topicVotes: TopicVoteMap;
+  onSetTopicTone: (id: string, tone: TopicTone) => void;
+  onVoteTopic: (id: string, vote: Exclude<TopicVote, null>) => void;
+  onEditTopic: (topic: Topic) => void;
   onRemoveCustomTopic: (id: string) => void;
   activeTopic: Topic | null;
   status: DebateStatus;
@@ -38,6 +49,11 @@ export function Sidebar({
   onSelectTopicFile,
   topics,
   customTopics,
+  topicMeta,
+  topicVotes,
+  onSetTopicTone,
+  onVoteTopic,
+  onEditTopic,
   onRemoveCustomTopic,
   activeTopic,
   status,
@@ -51,6 +67,41 @@ export function Sidebar({
   onSelectStyle,
 }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  // Fold a topic's stored meta into it for display & tone.
+  const withMeta = (topic: Topic): Topic => {
+    const meta = topicMeta[topic.id];
+    if (!meta) return topic;
+    return {
+      ...topic,
+      tone: meta.tone ?? topic.tone,
+      uses: meta.uses,
+      likes: meta.likes,
+      dislikes: meta.dislikes,
+      lastUsedAt: meta.lastUsedAt ?? topic.lastUsedAt,
+    };
+  };
+
+  const visibleCustom = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const match = (t: Topic) =>
+      !q ||
+      t.title.toLowerCase().includes(q) ||
+      (t.description ?? "").toLowerCase().includes(q) ||
+      (t.keywords ?? []).some((k) => k.toLowerCase().includes(q));
+    return customTopics.map(withMeta).filter(match);
+  }, [customTopics, topicMeta, query]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const visibleFile = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const match = (t: Topic) =>
+      !q ||
+      t.title.toLowerCase().includes(q) ||
+      (t.description ?? "").toLowerCase().includes(q) ||
+      (t.keywords ?? []).some((k) => k.toLowerCase().includes(q));
+    return topics.map(withMeta).filter(match);
+  }, [topics, topicMeta, query]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inner = (
     <div className="flex flex-col h-full">
@@ -113,6 +164,20 @@ export function Sidebar({
         </div>
       </div>
 
+      {/* Search */}
+      <div className="shrink-0 px-3 pb-2">
+        <div className="relative">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-xs">🔍</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search topics…"
+            className="w-full text-xs border border-border rounded-lg pl-7 pr-2.5 py-1.5 bg-white text-ink placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-moderator-avatar/40"
+          />
+        </div>
+      </div>
+
       {/* Topic list */}
       <div className="flex-1 overflow-y-auto px-3 pb-2">
         {/* Custom topic entry */}
@@ -122,44 +187,50 @@ export function Sidebar({
             onOpenCustomTopic();
           }}
           className="w-full text-left rounded-lg px-3 py-2.5 mb-3 text-sm transition-colors border border-dashed border-border hover:border-moderator-avatar/40"
-          title="Enter your own debate topic"
+          title="Add your own debate topic"
         >
           <div className="flex items-center gap-2">
             <span className="text-xl">📝</span>
-            <span className="font-medium text-ink/80">Custom Topic</span>
+            <span className="font-medium text-ink/80">Add Topic</span>
           </div>
-          <span className="block text-[10px] mt-1 text-muted/60">Type any topic to debate</span>
+          <span className="block text-[10px] mt-1 text-muted/60">Type a topic, pick a tone, optionally review &amp; refine with AI</span>
         </button>
 
-        {/* Previously entered topics */}
-        {customTopics.length > 0 && (
+        {/* Managed topics */}
+        {visibleCustom.length > 0 && (
           <>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted px-2 mb-2">
-              Your Topics
+              My Topics
             </p>
             <ul className="space-y-0.5 mb-3">
-              {customTopics.map((topic) => (
-                <li key={topic.id} className="group/row relative">
-                  <TopicButton
+              {visibleCustom.map((topic) => (
+                <li key={topic.id}>
+                  <TopicRow
                     topic={topic}
                     isActive={activeTopic?.id === topic.id}
+                    owned
+                    vote={topicVotes[topic.id] ?? null}
                     onSelect={() => {
                       onSelectTopic(topic);
                       setDrawerOpen(false);
                     }}
+                    onSetTone={(t) => onSetTopicTone(topic.id, t)}
+                    onVote={(v) => onVoteTopic(topic.id, v)}
+                    onEdit={() => onEditTopic(topic)}
+                    onRemove={() => {
+                      if (window.confirm(`Remove "${topic.title}" from My Topics?`)) {
+                        onRemoveCustomTopic(topic.id);
+                      }
+                    }}
                   />
-                  <button
-                    onClick={() => onRemoveCustomTopic(topic.id)}
-                    className="absolute top-1.5 right-1.5 opacity-0 group-hover/row:opacity-100 focus:opacity-100 text-muted hover:text-red-600 text-xs w-5 h-5 rounded flex items-center justify-center hover:bg-white transition-opacity"
-                    title="Remove from this list"
-                    aria-label={`Remove ${topic.title}`}
-                  >
-                    ✕
-                  </button>
                 </li>
               ))}
             </ul>
           </>
+        )}
+
+        {query && visibleCustom.length === 0 && visibleFile.length === 0 && (
+          <p className="text-[11px] text-muted px-2 py-3">No topics match “{query}”.</p>
         )}
 
         {/* Topics from the selected .yml file */}
@@ -167,15 +238,20 @@ export function Sidebar({
           {selectedTopicFile?.label ?? "Topics"}
         </p>
         <ul className="space-y-0.5">
-          {topics.map((topic) => (
+          {visibleFile.map((topic) => (
             <li key={topic.id}>
-              <TopicButton
+              <TopicRow
                 topic={topic}
                 isActive={activeTopic?.id === topic.id}
+                owned={false}
+                vote={topicVotes[topic.id] ?? null}
                 onSelect={() => {
                   onSelectTopic(topic);
                   setDrawerOpen(false);
                 }}
+                onSetTone={(t) => onSetTopicTone(topic.id, t)}
+                onVote={(v) => onVoteTopic(topic.id, v)}
+                onEdit={() => onEditTopic(topic)}
               />
             </li>
           ))}
@@ -230,59 +306,126 @@ export function Sidebar({
   );
 }
 
-// ── Topic row (shared by file topics and manually entered ones) ───────────────
+// ── Topic row ────────────────────────────────────────────────────────────────
 
-function TopicButton({
-  topic, isActive, onSelect,
+function TopicRow({
+  topic, isActive, owned, vote, onSelect, onSetTone, onVote, onEdit, onRemove,
 }: {
   topic: Topic;
   isActive: boolean;
+  owned: boolean;
+  vote: TopicVote;
   onSelect: () => void;
+  onSetTone: (tone: TopicTone) => void;
+  onVote: (vote: Exclude<TopicVote, null>) => void;
+  onEdit?: () => void;
+  onRemove?: () => void;
 }) {
-  const register = resolveRegister(topic.register);
+  const tone = resolveTone(topic.tone);
+  const activeCls = isActive
+    ? "bg-moderator-bg border-moderator-border"
+    : "bg-transparent border-transparent hover:bg-white hover:border-border";
+
   return (
-    <button
-      onClick={onSelect}
-      className={[
-        "w-full text-left rounded-lg px-3 py-2.5 pr-7 text-sm transition-colors group",
-        isActive
-          ? "bg-moderator-bg text-moderator-text font-medium"
-          : "text-ink hover:bg-white",
-      ].join(" ")}
-      aria-current={isActive ? "page" : undefined}
-    >
-      <span className="flex items-center gap-1.5 leading-snug">
-        <span className="min-w-0">{topic.title}</span>
-        <RegisterBadge register={register} />
-      </span>
-      {topic.description && (
-        <span
-          className={[
-            "block text-[11px] mt-0.5 line-clamp-2 leading-relaxed",
-            isActive ? "text-moderator-text/70" : "text-muted group-hover:text-ink/60",
-          ].join(" ")}
-        >
-          {topic.description}
+    <div className={`rounded-lg border px-3 pt-2 pb-2 transition-colors ${activeCls}`} aria-current={isActive ? "page" : undefined}>
+      {/* Clickable title area */}
+      <button
+        onClick={onSelect}
+        className="w-full text-left group"
+        aria-label={`Start debate: ${topic.title}`}
+      >
+        <span className="flex items-center gap-1.5 leading-snug text-sm">
+          <span className="min-w-0 font-medium">{topic.title}</span>
+          <ToneBadge tone={tone} />
         </span>
-      )}
-    </button>
+        {topic.description && (
+          <span
+            className={[
+              "block text-[11px] mt-0.5 line-clamp-2 leading-relaxed",
+              isActive ? "text-moderator-text/70" : "text-muted group-hover:text-ink/60",
+            ].join(" ")}
+          >
+            {topic.description}
+          </span>
+        )}
+      </button>
+
+      {/* Tone radio + stats */}
+      <div className="flex items-center gap-1 mt-1.5">
+        {TONE_DEFS.map((def) => (
+          <button
+            key={def.id}
+            onClick={() => onSetTone(def.id)}
+            title={def.tagline}
+            aria-pressed={tone === def.id}
+            className={[
+              "text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full border transition-colors",
+              tone === def.id
+                ? "border-moderator-avatar bg-moderator-avatar/15 text-moderator-text"
+                : "border-transparent text-muted/70 hover:border-border hover:text-ink",
+            ].join(" ")}
+          >
+            {def.label}
+          </button>
+        ))}
+
+        {/* stats — small print below each topic */}
+        <span className="ml-auto flex items-center gap-2 text-[10px] text-muted">
+          <span title="Times debated" className="tabular-nums">▶ {(topic.uses ?? 0)}</span>
+          <button
+            onClick={() => onVote("like")}
+            title="Liked this debate"
+            aria-pressed={vote === "like"}
+            className={vote === "like" ? "text-green-700 font-semibold" : "hover:text-ink transition-colors"}
+          >
+            👍 <span className="tabular-nums">{topic.likes ?? 0}</span>
+          </button>
+          <button
+            onClick={() => onVote("dislike")}
+            title="Disliked this debate"
+            aria-pressed={vote === "dislike"}
+            className={vote === "dislike" ? "text-red-700 font-semibold" : "hover:text-ink transition-colors"}
+          >
+            👎 <span className="tabular-nums">{topic.dislikes ?? 0}</span>
+          </button>
+          {owned && (
+            <>
+              <button
+                onClick={onEdit}
+                title="Edit this topic"
+                className="hover:text-ink transition-colors ml-1"
+              >
+                ✎
+              </button>
+              <button
+                onClick={onRemove}
+                title="Remove this topic"
+                className="hover:text-red-600 transition-colors"
+              >
+                ✕
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+    </div>
   );
 }
 
-/** Pill showing how a topic will be fought (SERIOUS / FRIVOLOUS). */
-function RegisterBadge({ register }: { register: "serious" | "frivolous" }) {
+/** Pill showing the chosen tone for this topic. */
+function ToneBadge({ tone }: { tone: TopicTone }) {
+  const def = TONE_DEFS.find((t) => t.id === tone) ?? TONE_DEFS[0];
+  const cls = tone === "serious"
+    ? "border-slate-300 bg-white text-slate-600"
+    : tone === "jovial"
+      ? "border-amber-300 bg-amber-50 text-amber-700"
+      : "border-sky-300 bg-sky-50 text-sky-700";
   return (
     <span
-      title={register === "frivolous" ? "Playful — comedy licence, no real stakes" : "Real stakes — sincere, evidence-facing"}
-      className={[
-        "shrink-0 inline-block text-[9px] font-semibold uppercase tracking-wider",
-        "px-1.5 py-0.5 rounded-full border leading-none",
-        register === "frivolous"
-          ? "border-amber-300 bg-amber-50 text-amber-700"
-          : "border-slate-300 bg-white text-slate-600",
-      ].join(" ")}
+      title={def.tagline}
+      className={`shrink-0 inline-block text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border leading-none ${cls}`}
     >
-      {register === "frivolous" ? "Playful" : "Serious"}
+      {def.label}
     </span>
   );
 }

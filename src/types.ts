@@ -3,30 +3,121 @@
 export type AgentId = "moderator" | "advocate" | "critic" | "audience";
 
 /**
- * How a debate should be fought. Changes tone, emotional licence, and how the
- * accuracy layers are applied:
+ * How a debate should be fought. A tone is picked with the radio buttons beside
+ * each topic (or stored on a managed topic) rather than being forced by the
+ * topic text itself. It changes emotional licence, vocabulary and how strictly
+ * the accuracy layers judge the speakers:
  *   - "serious"   real stakes; passionate but disciplined; fabrication is fatal.
- *   - "frivolous" playful; theatrical bias and comic exaggeration allowed, but
+ *   - "jovial"    playful; theatrical bias and comic exaggeration allowed, but
  *                 plausible-looking fakery is still rejected.
+ *   - "informal"  casual, conversational and approachable; relaxed, but no
+ *                 invented specifics slipped in as if real.
  */
-export type TopicRegister = "serious" | "frivolous";
+export type TopicTone = "serious" | "jovial" | "informal";
 
-export const DEFAULT_TOPIC_REGISTER: TopicRegister = "serious";
+/** The legacy YAML `register:` values that old topic files still ship with. */
+export type LegacyRegister = "serious" | "frivolous";
 
-/** Topics that don't declare a register are treated as serious. */
-export function resolveRegister(value: TopicRegister | null | undefined): TopicRegister {
-  return value === "frivolous" ? "frivolous" : "serious";
+export interface ToneDef {
+  id: TopicTone;
+  /** Short label for badges and intensities. */
+  label: string;
+  /** One-line description shown as a tooltip / in the header. */
+  tagline: string;
+  /**
+   * true → a reviewer `reject` forces a redo (strict).
+   * false → reviewer rejects are downgraded to flags so a single joke or a
+   *         casual turn can't be sent back; measured dead links still do.
+   */
+  strictFactCheck: boolean;
+  /** public/agents/register-<id>.md block injected into every speaker prompt. */
+  registerFile: string;
+}
+
+/** The tone catalogue. The order here is the order shown in the radio rows. */
+export const TONE_DEFS: ToneDef[] = [
+  {
+    id: "serious",
+    label: "Serious",
+    tagline: "Real stakes — sincere, evidence-facing argument. Strict fact-checking.",
+    strictFactCheck: true,
+    registerFile: "register-serious.md",
+  },
+  {
+    id: "jovial",
+    label: "Jovial",
+    tagline: "Playful and theatrical — comedy licence, low stakes. Relaxed fact-checking.",
+    strictFactCheck: false,
+    registerFile: "register-jovial.md",
+  },
+  {
+    id: "informal",
+    label: "Informal",
+    tagline: "Casual, conversational and accessible. Relaxed fact-checking.",
+    strictFactCheck: false,
+    registerFile: "register-informal.md",
+  },
+];
+
+export const DEFAULT_TOPIC_TONE: TopicTone = "serious";
+
+/** Tone catalogue lookup with a safe default. */
+export function toneDef(tone: TopicTone | null | undefined): ToneDef {
+  return TONE_DEFS.find((t) => t.id === tone) ?? TONE_DEFS[0];
+}
+
+/**
+ * Maps a stored tone (or legacy `register`) to a current tone id. Anything
+ * unknown, unset, or legacy "serious" resolves to "serious"; the old
+ * "frivolous" register lives on as "jovial".
+ */
+export function resolveTone(value: TopicTone | LegacyRegister | null | undefined): TopicTone {
+  if (value === "jovial" || value === "informal") return value;
+  if (value === "frivolous") return "jovial";
+  return "serious";
 }
 
 export interface Topic {
   id: string;
   title: string;
   description: string;
-  /** How the debaters should fight: "serious" (default) or "frivolous". */
-  register?: TopicRegister;
-  /** Source of the topic: "file" for YAML-loaded topics, "custom" for user-entered */
+  /**
+   * How the debaters should fight. Sources that predate the tone system embed a
+   * `register:` instead; resolveTone() knows both. Tone is a runtime choice —
+   * the user can flip it with the radio buttons at any time.
+   */
+  tone?: TopicTone;
+  /** Search keywords surfaced by the topic-review agent. */
+  keywords?: string[];
+  /** Source of the topic: "file" for YAML-loaded topics, "custom" for user-managed. */
   source?: "file" | "custom";
+  /** Times a debate has been run on this topic. */
+  uses?: number;
+  /** Like count (debates enjoyed). */
+  likes?: number;
+  /** Dislike count (debates not enjoyed). */
+  dislikes?: number;
+  /** ISO timestamp of the most recent debate on this topic. */
+  lastUsedAt?: string;
 }
+
+/**
+ * Per-topic counters and the current browser's tone override. Kept under one
+ * localStorage key so stats survive for both file topics and user topics.
+ */
+export interface TopicMeta {
+  uses: number;
+  likes: number;
+  dislikes: number;
+  tone?: TopicTone;
+  lastUsedAt?: string;
+}
+
+export type TopicToneMap = Record<string, TopicMeta | undefined>;
+
+/** How the current visitor voted on a topic (toggle semantics, per browser). */
+export type TopicVote = "like" | "dislike" | null;
+export type TopicVoteMap = Record<string, TopicVote>;
 
 /** Entry in public/topics/index.json */
 export interface TopicFileEntry {
@@ -34,7 +125,16 @@ export interface TopicFileEntry {
   label: string;
 }
 
-/** Per-agent config block inside a .yml topic file */
+/**
+ * A topic as written in a .yml topic file. Files still declare the legacy
+ * `register:` key (serious/frivolous); newer files may use `tone:` and
+ * `keywords:`. normalizeTopicFile() folds both into the runtime Topic shape.
+ */
+export interface RawTopic extends Omit<Topic, "tone"> {
+  tone?: TopicTone | LegacyRegister;
+  /** Legacy key — older files declare tone as a register. */
+  register?: TopicTone | LegacyRegister;
+}
 export interface AgentTopicConfig extends Partial<AgentDisplayMeta> {
   /** Extra instructions appended to the agent's base persona for this topic set. */
   persona_overlay?: string;
@@ -47,11 +147,24 @@ export interface TopicFileContent {
     advocate?: AgentTopicConfig;
     critic?: AgentTopicConfig;
   };
-  topics: Topic[];
+  topics: RawTopic[];
   /** Optional per-file style config. Absent = use session defaults for all agents. */
   style_config?: {
     /** When false, the moderator always speaks plain English regardless of the active style. Default: true. */
     moderator_applies: boolean;
+  };
+}
+
+/** Snaps a file topic into the runtime Topic shape (legacy register → tone). */
+export function normalizeTopic(raw: RawTopic): Topic {
+  return {
+    ...raw,
+    tone: resolveTone(raw.tone ?? raw.register),
+    source: raw.source ?? "file",
+    uses: raw.uses ?? 0,
+    likes: raw.likes ?? 0,
+    dislikes: raw.dislikes ?? 0,
+    keywords: raw.keywords ?? [],
   };
 }
 
@@ -287,6 +400,13 @@ export interface LLMSettings {
   gatewayPasscode: string;
   /** "server" spends the gateway's pre-defined key; "own" sends apiKey instead. */
   keySource: KeySource;
+  /**
+   * When creating a topic, run the raw prompt through the topic-review agent
+   * (public/agents/topic-reviewer.md) to refine, expand and keyword it before it
+   * is saved. Costs one LLM call per topic. Skip happens automatically when the
+   * LLM is unconfigured.
+   */
+  reviewNewTopics: boolean;
   typewriter: TypewriterSettings;
   factCheck: FactCheckSettings;
 }
@@ -324,6 +444,7 @@ export const DEFAULT_SETTINGS: LLMSettings = {
   gatewayProviderId: envStr(import.meta.env.VITE_GATEWAY_PROVIDER, ""),
   gatewayPasscode:   "",
   keySource:         "server",
+  reviewNewTopics:   envBool(import.meta.env.VITE_REVIEW_NEW_TOPICS, true),
   typewriter: {
     enabled:         envBool(import.meta.env.VITE_TYPEWRITER, true),
     mode:            envStr(import.meta.env.VITE_TYPEWRITER_MODE, "word") === "char" ? "char" : "word",
