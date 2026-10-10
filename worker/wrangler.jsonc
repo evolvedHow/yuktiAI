@@ -3,7 +3,10 @@
   "name": "yukti-llm-gateway",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-28",
-  "compatibility_flags": ["nodejs_compat"],
+  // global_fetch_strictly_public is required so this Worker can fetch the
+  // worker-env vault on the same *.workers.dev zone (otherwise Cloudflare
+  // rejects the subrequest with error 1042).
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 
   "observability": {
     "enabled": true,
@@ -27,7 +30,7 @@
     "VAULT_CONTEXT": "yuktiai",
 
     // Profile used when the browser does not name one.
-    "DEFAULT_PROVIDER": "groq",
+    "DEFAULT_PROVIDER": "anthropic",
 
     // Extra provider profiles beyond the built-ins in src/providers.ts.
     // JSON array of { id, label, baseUrl, defaultModel, models? }.

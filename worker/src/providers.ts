@@ -54,8 +54,8 @@ export const BUILTIN_PROFILES: ProviderProfile[] = [
         id: "anthropic",
         label: "Anthropic",
         baseUrl: "https://api.anthropic.com/v1",
-        defaultModel: "claude-sonnet-5",
-        models: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"],
+        defaultModel: "claude-haiku-4-5-20251001",
+        models: ["claude-haiku-4-5-20251001", "claude-sonnet-5", "claude-opus-5"],
     },
     {
         id: "openrouter",
