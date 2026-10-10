@@ -21,7 +21,7 @@
     // Base URL of the worker-env vault holding this app's secrets. Set this,
     // then store the vault bearer token with `npx wrangler secret put VAULT_TOKEN`.
     // e.g. "https://worker-env-vault.<your-subdomain>.workers.dev"
-    "VAULT_URL": "",
+    "VAULT_URL": "https://worker-env-vault.vish-ganapathy.workers.dev",
 
     // Vault context this gateway reads provider keys from (KEY_<PROVIDER>, …).
     "VAULT_CONTEXT": "yuktiai",
