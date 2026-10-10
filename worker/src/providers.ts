@@ -36,46 +36,56 @@ export interface ProviderProfile {
 }
 
 export const BUILTIN_PROFILES: ProviderProfile[] = [
-  {
-    id: "groq",
-    label: "Groq",
-    baseUrl: "https://api.groq.com/openai/v1",
-    defaultModel: "llama-3.3-70b-versatile",
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen/qwen3-32b"],
-  },
-  {
-    id: "openai",
-    label: "OpenAI",
-    baseUrl: "https://api.openai.com/v1",
-    defaultModel: "gpt-4o-mini",
-    models: ["gpt-4o-mini", "gpt-4o"],
-  },
-  {
-    id: "anthropic",
-    label: "Anthropic",
-    baseUrl: "https://api.anthropic.com/v1",
-    defaultModel: "claude-sonnet-5",
-    models: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"],
-  },
-  {
-    id: "openrouter",
-    label: "OpenRouter",
-    baseUrl: "https://openrouter.ai/api/v1",
-    defaultModel: "meta-llama/llama-3.3-70b-instruct",
-  },
-  {
-    id: "together",
-    label: "Together AI",
-    baseUrl: "https://api.together.xyz/v1",
-    defaultModel: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-  },
-  {
-    id: "cerebras",
-    label: "Cerebras",
-    baseUrl: "https://api.cerebras.ai/v1",
-    defaultModel: "llama-3.3-70b",
-  },
+    {
+        id: "groq",
+        label: "Groq",
+        baseUrl: "https://api.groq.com/openai/v1",
+        defaultModel: "groq/compound-mini",
+        models: ["groq/compound-mini"],
+    },
+    {
+        id: "openai",
+        label: "OpenAI",
+        baseUrl: "https://api.openai.com/v1",
+        defaultModel: "gpt-4o-mini",
+        models: ["gpt-4o-mini", "gpt-4o"],
+    },
+    {
+        id: "anthropic",
+        label: "Anthropic",
+        baseUrl: "https://api.anthropic.com/v1",
+        defaultModel: "claude-sonnet-5",
+        models: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"],
+    },
+    {
+        id: "openrouter",
+        label: "OpenRouter",
+        baseUrl: "https://openrouter.ai/api/v1",
+        defaultModel: "meta-llama/llama-3.3-70b-instruct",
+    },
+    {
+        id: "together",
+        label: "Together AI",
+        baseUrl: "https://api.together.xyz/v1",
+        defaultModel: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+    },
+    {
+        id: "cerebras",
+        label: "Cerebras",
+        baseUrl: "https://api.cerebras.ai/v1",
+        defaultModel: "llama-3.3-70b",
+    },
+    {
+        id: "google",
+        label: "Google",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/interactions",
+        defaultModel: "gemini-2.5-flash",
+        models: ["gemini-2.5-flash","gemini-3.5-flash", "gemini-3.8-flash"],
+    },
 ];
+
+
+
 
 /** "my-llama.2" → "MY_LLAMA_2" */
 export function slugFor(id: string): string {

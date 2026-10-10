@@ -91,7 +91,7 @@ export function describeConfigProblem(
         "such as https://api.groq.com/openai/v1.";
     }
     if (!settings.model.trim()) {
-      return "No model name is set. In Settings → 🔑 Key Vault enter a model (e.g. llama-3.3-70b-versatile).";
+      return "No model name is set. In Settings → 🔑 Key Vault enter a model (e.g. groq/compound-mini).";
     }
     return null;
   }

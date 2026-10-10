@@ -1,3 +1,15 @@
+/**
+ * MessageCard — renders a single debate message.
+ *
+ * Agent turns are styled per-role (colors in AGENT_STYLE; names come from the
+ * agent .md frontmatter via AgentNames). The body is rendered by Markdown.tsx
+ * and may carry a ReviewPanel when the turn was fact-checked. Audience questions
+ * render as a compact italic callout instead of a full card.
+ *
+ * The component is memoised: RevealQueue emits one new message object per chunk,
+ * so without the custom comparator every completed turn would be re-parsed as
+ * markdown on each frame.
+ */
 import { memo } from "react";
 import { AgentId, AgentNames, Message } from "../types";
 import { Markdown } from "./Markdown";

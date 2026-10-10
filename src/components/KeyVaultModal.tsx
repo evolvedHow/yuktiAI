@@ -175,7 +175,7 @@ export function KeyVaultModal({ settings, onSave, onClose }: Props) {
                       type="text"
                       value={draft.model}
                       onChange={(e) => set("model", e.target.value)}
-                      placeholder="llama-3.3-70b-versatile"
+                      placeholder="groq/compound-mini"
                       className={inputCls}
                     />
                   </Field>
@@ -230,7 +230,7 @@ export function KeyVaultModal({ settings, onSave, onClose }: Props) {
                   type="text"
                   value={draft.model}
                   onChange={(e) => set("model", e.target.value)}
-                  placeholder="llama-3.3-70b-versatile"
+                  placeholder="groq/compound-mini"
                   className={inputCls}
                 />
               </Field>

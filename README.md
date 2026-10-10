@@ -40,7 +40,7 @@ Two modes, switchable at runtime in **Settings**:
 
 | Mode | How it works | Use when |
 |---|---|---|
-| **Gateway** *(recommended)* | The browser calls the [Cloudflare Worker](worker/README.md), which injects a key it holds as a Worker secret. | Anything public or shared. |
+| **Gateway** *(recommended)* | The browser calls the [Cloudflare Worker](worker/README.md), which injects a key it reads from the central worker-env vault. | Anything public or shared. |
 | **Direct** | The browser calls the provider itself with a key from `localStorage`. | Local development, personal use. |
 
 In gateway mode users pick a **provider profile** (Groq, OpenAI, Anthropic, …).
@@ -48,8 +48,9 @@ Profiles the gateway has a key for are marked *key on gateway*; for the rest —
 or when a user prefers their own account — Settings offers **My own key**, which
 is forwarded through the gateway and never stored server-side.
 
-Adding another key later needs no frontend change: set one more secret on the
-Worker (`wrangler secret put KEY_<PROVIDER>`) and it appears in the picker.
+Adding another key later needs no frontend change: add `KEY_<PROVIDER>` to the
+vault context `yuktiai` (see [worker/README.md](worker/README.md)) and it appears
+in the picker on the next page load.
 
 ### The Key Vault
 
@@ -60,6 +61,32 @@ against casual fiddling, not a hardened secret — and the whole vault can be
 disabled by emptying that password. Nothing entered there is sent anywhere
 except, at debate time, to the configured provider or gateway.
 
+**Operating the vault:**
+
+1. **Open it** — click **Settings** (⚙️ in the sidebar) → **🔑 Key Vault**, or
+   click the **🔑 Open Key Vault** button in the amber setup banner that shows
+   while no LLM is configured. `Esc` or clicking the backdrop closes it.
+2. **Unlock** — if a `password:` is set in `public/config/vault.yaml`, enter it.
+   With a blank password the vault opens straight away. The unlock lasts for the
+   browser session (**Lock vault** re-locks it, a browser restart locks it too).
+3. **Choose who pays.** Either:
+   - **Gateway mode** — paste the gateway URL (your Cloudflare Worker), pick the
+     **Provider profile** (groq, openai, …) and **Provider model**, add the
+     gateway's **passcode** if it requires one, and optionally a personal
+     **My own key** to forward instead of the gateway's server-held key.
+   - **Direct mode** — leave the gateway URL blank (or clear it) and enter the
+     provider **base URL**, a **Direct API key**, and the **model**.
+4. **Save** — everything is written to this browser's `localStorage`
+   (`SettingsModal` reads it back on every page load). The **Save keys** button
+   confirms; nothing is transmitted at save-time.
+5. **Change or disable the password** — edit `password:` in
+   `public/config/vault.yaml` (an empty string disables the lock) and redeploy.
+   The default password shown there is deliberately public: it guards against
+   casual fiddling on a shared page, not against determined users.
+
+> Default vault password: `yukti-vault-2026` — change it before sharing the
+> deployed site widely.
+
 **Starting a debate is blocked until an LLM is configured.** With no key or
 gateway URL, starting shows the precise fix required and the header keeps a
 persistent warning banner with a shortcut to the vault. The topic-review agent
@@ -68,10 +95,12 @@ exist.
 
 **One Worker serves every provider — there is no per-provider Worker.** The
 single Worker is selected by the `X-Yukti-Provider` header (or a `provider`
-field in the request body), and each provider's key is a separate secret named
-after the profile (`KEY_GROQ`, `KEY_OPENAI`, `KEY_ANTHROPIC`, …). New providers
-are added by setting a secret plus an optional `EXTRA_PROVIDERS` JSON variable —
-no code change, no redeploy of the app, and no second Worker.
+field in the request body), and each provider's key is a separate entry in the
+central **worker-env vault** named after the profile (`KEY_GROQ`, `KEY_OPENAI`,
+`KEY_ANTHROPIC`, …). New providers are added by adding a vault key plus an
+optional `EXTRA_PROVIDERS` JSON variable — no code change, no redeploy of the
+app, and no second Worker. The gateway itself holds only `VAULT_URL` and
+`VAULT_TOKEN`; all provider keys stay in the vault.
 
 **The Worker itself is not hardcoded anywhere in the app.** The frontend only
 ever reads the gateway URL from `VITE_BACKEND_URL` at build time or from

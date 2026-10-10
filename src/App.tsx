@@ -1,3 +1,11 @@
+/**
+ * App — top-level composition root.
+ *
+ * Owns the three modals (Settings, Key Vault, topic editor) and wires the
+ * useDebate hook to the Sidebar and DebateTranscript. Also renders the persistent
+ * setup-warning banner that appears until the LLM is configured; its shortcut
+ * button opens the password-gated Key Vault directly.
+ */
 import { useState } from "react";
 import { useDebate } from "./hooks/useDebate";
 import { Sidebar } from "./components/Sidebar";

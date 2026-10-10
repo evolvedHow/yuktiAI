@@ -262,7 +262,7 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
                   type="text"
                   value={draft.model}
                   onChange={(e) => set("model", e.target.value)}
-                  placeholder={selectedProvider?.defaultModel || "llama-3.3-70b-versatile"}
+                  placeholder={selectedProvider?.defaultModel || "groq/compound-mini"}
                   list={selectedProvider?.models?.length ? "gateway-models" : undefined}
                   className={inputCls}
                 />
@@ -331,7 +331,7 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
                   type="text"
                   value={draft.model}
                   onChange={(e) => set("model", e.target.value)}
-                  placeholder="llama-3.3-70b-versatile"
+                  placeholder="groq/compound-mini"
                   className={inputCls}
                 />
               </Field>

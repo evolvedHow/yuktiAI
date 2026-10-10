@@ -10,32 +10,35 @@
     "logs": { "head_sampling_rate": 1 }
   },
 
-  // Non-secret configuration. API keys are NEVER set here — use
-  // `npx wrangler secret put KEY_<PROVIDER>` instead (see README.md).
+  // Non-secret configuration. Provider API keys are NEVER set here — they live
+  // in the central worker-env vault and are fetched at runtime (see vault.ts).
   "vars": {
     // Comma-separated origin allowlist. "*" allows any origin.
     // Replace with your GitHub Pages origin before going public, e.g.
     // "https://your-user.github.io,http://localhost:5173"
     "ALLOWED_ORIGINS": "*",
 
+    // Base URL of the worker-env vault holding this app's secrets. Set this,
+    // then store the vault bearer token with `npx wrangler secret put VAULT_TOKEN`.
+    // e.g. "https://worker-env-vault.<your-subdomain>.workers.dev"
+    "VAULT_URL": "",
+
+    // Vault context this gateway reads provider keys from (KEY_<PROVIDER>, …).
+    "VAULT_CONTEXT": "yuktiai",
+
     // Profile used when the browser does not name one.
     "DEFAULT_PROVIDER": "groq",
 
     // Extra provider profiles beyond the built-ins in src/providers.ts.
     // JSON array of { id, label, baseUrl, defaultModel, models? }.
-    // Each entry still reads its key from the KEY_<ID> secret.
+    // Each entry still reads its key from the vault as KEY_<ID>.
     // Example:
     // "[{\"id\":\"my-vllm\",\"label\":\"Self-hosted vLLM\",\"baseUrl\":\"https://llm.example.com/v1\",\"defaultModel\":\"qwen2.5-32b\"}]"
     "EXTRA_PROVIDERS": "[]"
-  },
+  }
 
-  // Per-IP rate limit so a public gateway cannot be drained by a stranger.
-  // period must be 10 or 60 (seconds).
-  "ratelimits": [
-    {
-      "name": "RATE_LIMITER",
-      "namespace_id": "1001",
-      "simple": { "limit": 60, "period": 60 }
-    }
-  ]
+  // Note: a `ratelimits` binding (per-IP limit) was removed here because it
+  // requires the paid Workers plan — on a free plan the binding fails to
+  // provision and the Worker refuses to start (HTTP 1101 on every route).
+  // To re-enable, add back a "ratelimits" array and upgrade to the paid plan.
 }

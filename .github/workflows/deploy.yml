@@ -1,3 +1,6 @@
+# Builds the static site and deploys it to GitHub Pages on every push to `main`.
+# VITE_BACKEND_URL etc. come in as repository variables at build time; secrets are
+# only used for the direct-provider defaults. See README.md → "Deploy to GitHub Pages".
 name: Deploy to GitHub Pages
 
 on:

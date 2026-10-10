@@ -1,3 +1,8 @@
+/**
+ * Markdown export — renders the finished debate as a single .md file that
+ * downloads to the user's machine. Used by the "Export Markdown" action in the
+ * transcript once a debate concludes. The PDF export is separate (exportPDF.ts).
+ */
 import { AgentNames, Message, Topic } from "../types";
 
 export function buildMarkdown(topic: Topic, messages: Message[], agentNames: AgentNames): string {

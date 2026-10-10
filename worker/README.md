@@ -3,6 +3,11 @@
 Holds the LLM provider API keys so the debate arena — a static site on GitHub
 Pages — never ships a key in its JavaScript bundle.
 
+Secrets are not set on this Worker one by one. The gateway reads them from the
+central **worker-env vault** (see [`src/vault.ts`](src/vault.ts)) and holds only
+two credentials itself: `VAULT_URL` (a plain var) and `VAULT_TOKEN` (a secret).
+That keeps every app's keys in one place and makes rotation a vault edit.
+
 It speaks the OpenAI chat-completions wire format, so the frontend talks to it
 exactly the way it talks to a provider directly. Streaming is passed straight
 through, so token-by-token rendering still works.
@@ -11,21 +16,25 @@ through, so token-by-token rendering still works.
 
 ## The key model
 
-Two things the gateway is built around:
+Three things the gateway is built around:
 
-**Pre-defined keys.** Each *provider profile* (`groq`, `openai`, `anthropic`, …)
-reads its key from a Worker secret named `KEY_<PROFILE_ID>`. Set the ones you
-want available to everyone; leave the rest unset.
+**Server-held keys, from the vault.** Each *provider profile* (`groq`, `openai`,
+`anthropic`, …) reads its key from vault key `KEY_<PROFILE_ID>` in the context
+named by `VAULT_CONTEXT` (default `yuktiai`). Add the keys you want available to
+everyone to the vault; leave the rest out.
 
-**Extra keys, added later.** Two ways, no redeploy of the frontend needed:
+**Extra keys, added later.** Two ways, no redeploy of this Worker needed:
 
-- *Server-side* — add a new secret (and, for a provider not already built in, an
-  entry in the `EXTRA_PROVIDERS` var). It appears in the app's provider list on
-  the next page load.
+- *Server-side* — add a vault key `KEY_<ID>` (and, for a provider not already
+  built in, an entry in the `EXTRA_PROVIDERS` var). It appears in the app's
+  provider list on the next page load.
 - *Client-side (BYOK)* — a user can paste their own key in the app's Settings and
   pick **Use my own key**. The browser sends it as an `Authorization: Bearer`
   header and the gateway forwards that instead of any server-held key. Nothing
   is stored.
+
+A direct Worker binding of the same name (`KEY_GROQ`, `ACCESS_PASSCODE`) still
+takes precedence over the vault — a local-dev override and break-glass path.
 
 Built-in profiles live in [`src/providers.ts`](src/providers.ts).
 
@@ -38,12 +47,28 @@ cd worker
 npm install
 ```
 
+### Point at the vault
+
+Set the vault URL in `wrangler.jsonc` (`VAULT_URL`, non-secret) and store the
+vault token as a Worker secret:
+
+```bash
+npx wrangler secret put VAULT_TOKEN
+```
+
+Both values live in `~/docker/stack/.env` on this machine. Then add this app's
+keys to the vault context `yuktiai` — e.g. `yuktiai/KEY_GROQ`, `yuktiai/KEY_OPENAI`,
+and optionally `yuktiai/ACCESS_PASSCODE` — and redeploy the vault.
+
 ### Local development
 
 ```bash
-cp .dev.vars.example .dev.vars   # add at least one KEY_* value
+cp .dev.vars.example .dev.vars   # set VAULT_URL + VAULT_TOKEN
 npx wrangler dev                 # → http://localhost:8787
 ```
+
+To work offline without a running vault, set a direct `KEY_*` binding in
+`.dev.vars` instead — it overrides the vault.
 
 Then in the app's **Settings → Gateway**, set the URL to `http://localhost:8787`.
 
@@ -53,18 +78,14 @@ Then in the app's **Settings → Gateway**, set the URL to `http://localhost:878
 npx wrangler deploy
 ```
 
-Then set your keys as secrets (these are encrypted at rest and never appear in
-`wrangler.jsonc` or the dashboard):
+No per-provider secrets are needed — the keys are already in the vault. To
+override one provider without touching the vault, a direct binding still wins:
 
 ```bash
 npx wrangler secret put KEY_GROQ
 ```
 
-```bash
-npx wrangler secret put KEY_OPENAI
-```
-
-Repeat for any provider you want to offer. To check what landed:
+To check what landed:
 
 ```bash
 npx wrangler secret list
@@ -72,12 +93,13 @@ npx wrangler secret list
 
 ### Lock it down before sharing the URL
 
-Two settings in `wrangler.jsonc` / secrets, both worth doing for a public deploy:
+Two settings, both worth doing for a public deploy:
 
 1. **`ALLOWED_ORIGINS`** — replace `"*"` with your real origins, e.g.
    `"https://your-user.github.io,http://localhost:5173"`. Browsers will refuse
    responses from anywhere else.
-2. **`ACCESS_PASSCODE`** — a shared secret users enter once in Settings:
+2. **`ACCESS_PASSCODE`** — a shared secret users enter once in Settings. Add
+   `ACCESS_PASSCODE` to the vault context (or set a direct Worker secret):
 
    ```bash
    npx wrangler secret put ACCESS_PASSCODE
@@ -96,13 +118,10 @@ Set `EXTRA_PROVIDERS` in `wrangler.jsonc` to a JSON array (as a string):
 "EXTRA_PROVIDERS": "[{\"id\":\"my-vllm\",\"label\":\"Self-hosted vLLM\",\"baseUrl\":\"https://llm.example.com/v1\",\"defaultModel\":\"qwen2.5-32b\"}]"
 ```
 
-Then add its key and deploy:
+Then add its key to the vault context `yuktiai` as `KEY_MY_VLLM` and redeploy the
+vault. (A direct `npx wrangler secret put KEY_MY_VLLM` also works as an override.)
 
-```bash
-npx wrangler secret put KEY_MY_VLLM && npx wrangler deploy
-```
-
-The id → secret-name rule is: uppercase, and every run of non-alphanumeric
+The id → key-name rule is: uppercase, and every run of non-alphanumeric
 characters becomes a single `_`. So `my-vllm` → `KEY_MY_VLLM`.
 
 An entry whose `id` matches a built-in overrides that built-in — handy for

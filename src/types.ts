@@ -435,7 +435,7 @@ function envBool(raw: string | undefined, fallback: boolean): boolean {
 export const DEFAULT_SETTINGS: LLMSettings = {
   baseUrl:           envStr(import.meta.env.VITE_LLM_BASE_URL, "https://api.groq.com/openai/v1"),
   apiKey:            envStr(import.meta.env.VITE_LLM_API_KEY, ""),
-  model:             envStr(import.meta.env.VITE_LLM_MODEL, "llama-3.3-70b-versatile"),
+  model:             envStr(import.meta.env.VITE_LLM_MODEL, "groq/compound-mini"),
   maxTokensPerTurn:  envNum(import.meta.env.VITE_MAX_TOKENS, 420),
   interTurnDelayMs:  envNum(import.meta.env.VITE_TURN_DELAY_MS, 8000),
   autoAdvance:       envBool(import.meta.env.VITE_AUTO_ADVANCE, true),
@@ -462,7 +462,7 @@ export const PROVIDER_PRESETS: { label: string; baseUrl: string; placeholder: st
   {
     label: "Groq (free)",
     baseUrl: "https://api.groq.com/openai/v1",
-    placeholder: "llama-3.3-70b-versatile",
+    placeholder: "groq/compound-mini",
   },
   {
     label: "OpenAI",

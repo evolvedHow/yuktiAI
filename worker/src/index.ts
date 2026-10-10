@@ -5,6 +5,10 @@
  * ships a key in its bundle. Speaks the OpenAI chat-completions wire format, so
  * the frontend talks to it exactly the way it talks to any provider.
  *
+ * Secrets (provider keys and the access passcode) are read from the central
+ * worker-env vault — see vault.ts. Only VAULT_URL and VAULT_TOKEN are held here;
+ * a direct binding of the same name still overrides the vault for local dev.
+ *
  * Routes
  *   OPTIONS *                  CORS preflight
  *   GET     /health            liveness + provider count
@@ -26,6 +30,7 @@ import {
   resolveProfiles,
   secretNameFor,
 } from "./providers";
+import { resolveSecret, vaultContextFor } from "./vault";
 import { MAX_URLS, verifyLinks } from "./verifyLinks";
 
 /**
@@ -39,6 +44,12 @@ interface KnownBindings {
   ALLOWED_ORIGINS?: string;
   /** When set, callers must send a matching X-Yukti-Passcode on /v1/*. */
   ACCESS_PASSCODE?: string;
+  /** Base URL of the worker-env vault serving this app's provider keys. */
+  VAULT_URL?: string;
+  /** Bearer token for the vault (set via `wrangler secret put VAULT_TOKEN`). */
+  VAULT_TOKEN?: string;
+  /** Vault context holding this app's secrets. Defaults to "yuktiai". */
+  VAULT_CONTEXT?: string;
   /** JSON array of extra ProviderProfile entries. */
   EXTRA_PROVIDERS?: string;
   /** Profile used when the caller does not name one. */
@@ -67,8 +78,8 @@ export default {
       const { pathname } = new URL(request.url);
       const route = `${request.method} ${pathname}`;
 
-      if (route === "GET /health") return handleHealth(env, cors);
-      if (route === "GET /providers") return handleProviders(env, cors);
+      if (route === "GET /health") return await handleHealth(env, cors);
+      if (route === "GET /providers") return await handleProviders(env, cors);
       if (route === "POST /verify-links") return await handleVerifyLinks(request, env, cors);
       if (route === "POST /v1/chat/completions") return await handleChat(request, env, cors);
 
@@ -87,36 +98,42 @@ export default {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-function handleHealth(env: Env, cors: Headers): Response {
+async function handleHealth(env: Env, cors: Headers): Promise<Response> {
   const profiles = resolveProfiles(env.EXTRA_PROVIDERS);
+  const keys = await Promise.all(profiles.map((p) => serverKeyFor(env, p.id)));
+  const passcode = await accessPasscodeFor(env);
   return jsonResponse(
     {
       ok: true,
       service: "yukti-llm-gateway",
       providers: profiles.length,
-      providersWithServerKey: profiles.filter((p) => serverKeyFor(env, p.id) !== null).length,
-      requiresPasscode: Boolean(env.ACCESS_PASSCODE),
+      providersWithServerKey: keys.filter((key) => key !== null).length,
+      requiresPasscode: Boolean(passcode),
     },
     200,
     cors,
   );
 }
 
-function handleProviders(env: Env, cors: Headers): Response {
+async function handleProviders(env: Env, cors: Headers): Promise<Response> {
   const profiles = resolveProfiles(env.EXTRA_PROVIDERS);
+  const passcode = await accessPasscodeFor(env);
+  const providers = await Promise.all(
+    profiles.map(async (p) => ({
+      id: p.id,
+      label: p.label,
+      baseUrl: effectiveBaseUrl(env, p),
+      defaultModel: p.defaultModel,
+      models: p.models ?? [],
+      // Only ever a boolean — the key itself never leaves the Worker.
+      hasServerKey: (await serverKeyFor(env, p.id)) !== null,
+    })),
+  );
   return jsonResponse(
     {
       defaultProvider: env.DEFAULT_PROVIDER ?? profiles[0]?.id ?? "",
-      requiresPasscode: Boolean(env.ACCESS_PASSCODE),
-      providers: profiles.map((p) => ({
-        id: p.id,
-        label: p.label,
-        baseUrl: effectiveBaseUrl(env, p),
-        defaultModel: p.defaultModel,
-        models: p.models ?? [],
-        // Only ever a boolean — the key itself never leaves the Worker.
-        hasServerKey: serverKeyFor(env, p.id) !== null,
-      })),
+      requiresPasscode: Boolean(passcode),
+      providers,
     },
     200,
     cors,
@@ -159,9 +176,10 @@ async function handleVerifyLinks(request: Request, env: Env, cors: Headers): Pro
 
 /** Passcode + rate-limit checks shared by every endpoint that costs us money. */
 async function guardRequest(request: Request, env: Env, cors: Headers): Promise<Response | null> {
-  if (env.ACCESS_PASSCODE) {
+  const passcode = await accessPasscodeFor(env);
+  if (passcode) {
     const supplied = request.headers.get("X-Yukti-Passcode") ?? "";
-    if (!(await constantTimeEquals(supplied, env.ACCESS_PASSCODE))) {
+    if (!(await constantTimeEquals(supplied, passcode))) {
       return errorResponse(401, "Invalid or missing passcode.", cors);
     }
   }
@@ -218,13 +236,21 @@ async function handleChat(request: Request, env: Env, cors: Headers): Promise<Re
     );
   }
 
+  // A caller that leaves the model blank falls back to the profile's default.
+  // The frontend ships a blank model while it hasn't been typed into the vault,
+  // so this is what makes "leave it empty" actually use the default.
+  if (typeof body.model !== "string" || !body.model.trim()) {
+    body.model = profile.defaultModel;
+  }
+
   const callerKey = bearerToken(request.headers.get("Authorization"));
-  const apiKey = callerKey ?? serverKeyFor(env, profile.id);
+  const apiKey = callerKey ?? (await serverKeyFor(env, profile.id));
   if (!apiKey) {
     return errorResponse(
       400,
-      `No API key available for "${profile.id}". Either set the ${secretNameFor(profile.id)} secret ` +
-        `on the gateway, or send your own key as an Authorization: Bearer header.`,
+      `No API key available for "${profile.id}". Add the ${secretNameFor(profile.id)} secret ` +
+        `to the vault context "${vaultContextFor(env)}", or send your own key as an ` +
+        `Authorization: Bearer header.`,
       cors,
     );
   }
@@ -275,10 +301,17 @@ async function handleChat(request: Request, env: Env, cors: Headers): Promise<Re
 
 // ── Keys & profiles ───────────────────────────────────────────────────────────
 
-/** Returns the server-held key for a profile, or null when none is configured. */
-function serverKeyFor(env: Env, id: string): string | null {
-  const value = env[secretNameFor(id)];
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+/**
+ * Returns the server-held key for a profile, or null when none is configured.
+ * The key comes from a direct Worker binding if present, otherwise the vault.
+ */
+async function serverKeyFor(env: Env, id: string): Promise<string | null> {
+  return resolveSecret(env, secretNameFor(id));
+}
+
+/** Returns the shared access passcode, or null when none is configured. */
+async function accessPasscodeFor(env: Env): Promise<string | null> {
+  return resolveSecret(env, "ACCESS_PASSCODE");
 }
 
 function effectiveBaseUrl(env: Env, profile: ProviderProfile): string {

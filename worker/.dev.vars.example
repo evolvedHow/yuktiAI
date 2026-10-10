@@ -1,20 +1,20 @@
 # Local-only secrets for `wrangler dev`. Copy to .dev.vars (git-ignored).
 # In production these are set with:  npx wrangler secret put <NAME>
 
-# ── Provider keys ─────────────────────────────────────────────────────────────
-# One per provider profile. The name is KEY_ + the profile id, uppercased with
-# non-alphanumerics replaced by "_". Set only the ones you actually use —
-# providers without a key simply show as "bring your own key" in the app.
-KEY_GROQ=
-# KEY_OPENAI=
-# KEY_ANTHROPIC=
-# KEY_OPENROUTER=
-# KEY_TOGETHER=
-# KEY_CEREBRAS=
+# ── Secret vault (worker-env) ─────────────────────────────────────────────────
+# The gateway reads provider keys from the central worker-env vault. Point it at
+# a local or deployed vault and give it the bearer token. Both values come from
+# ~/docker/stack/.env on this machine.
+VAULT_URL=http://127.0.0.1:8787
+VAULT_TOKEN=
 
-# ── Optional: shared access passcode ──────────────────────────────────────────
-# When set, the app must send a matching passcode before the gateway will spend
-# any server-held key. Leave unset for an open (unauthenticated) gateway.
+# Vault context holding this app's secrets (KEY_GROQ, ACCESS_PASSCODE, …).
+VAULT_CONTEXT=yuktiai
+
+# ── Direct overrides (optional) ───────────────────────────────────────────────
+# A plain binding of the same name takes precedence over the vault. Handy for
+# offline dev without a running vault; leave unset in production.
+# KEY_GROQ=
 # ACCESS_PASSCODE=
 
 # ── Optional: per-profile base URL override ───────────────────────────────────

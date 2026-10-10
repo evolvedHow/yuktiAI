@@ -12,11 +12,15 @@ Endpoints:
 Environment variables (see .env.example):
   LLM_BASE_URL   — upstream provider base URL (no trailing slash)
                    default: https://api.groq.com/openai
-  LLM_API_KEY    — upstream API key (required)
+  LLM_API_KEY    — upstream API key; when blank it is read from the vault
   LLM_MODEL      — default model (optional; frontend model field takes precedence)
   ALLOWED_ORIGINS — comma-separated CORS origins, default "*"
+  VAULT_URL      — base URL of the worker-env secret vault (optional)
+  VAULT_TOKEN    — bearer token for the vault (optional)
+  VAULT_CONTEXT  — vault context holding this app's secrets, default "yuktiai"
 """
 
+import asyncio
 import os
 import logging
 from contextlib import asynccontextmanager
@@ -25,13 +29,41 @@ import httpx
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
+from worker_env import SecretClient, VaultError
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger("yukti-backend")
 
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.groq.com/openai").rstrip("/")
-LLM_API_KEY  = os.environ.get("LLM_API_KEY", "")
+LLM_API_KEY  = os.environ.get("LLM_API_KEY", "").strip()
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",")]
+
+VAULT_URL = os.environ.get("VAULT_URL", "").strip()
+VAULT_TOKEN = os.environ.get("VAULT_TOKEN", "").strip()
+VAULT_CONTEXT = os.environ.get("VAULT_CONTEXT", "yuktiai").strip() or "yuktiai"
+VAULT_API_KEY_NAME = "LLM_API_KEY"
+
+
+def _api_key_from_vault() -> str:
+    """Read the upstream API key from the worker-env vault.
+
+    Used only when ``LLM_API_KEY`` is not set in the environment. The vault is
+    the single source of truth for secrets; this backend holds no key of its own.
+
+    Returns:
+        The key value, or an empty string when the vault is unconfigured, the
+        secret is absent, or the vault cannot be reached (failing open to a
+        clear "not configured" error at request time rather than at import).
+    """
+    if not VAULT_URL or not VAULT_TOKEN:
+        return ""
+    try:
+        with SecretClient(base_url=VAULT_URL, token=VAULT_TOKEN) as client:
+            return client.get(VAULT_CONTEXT, VAULT_API_KEY_NAME).value
+    except VaultError as exc:
+        log.warning("Vault lookup for %s/%s failed: %s", VAULT_CONTEXT, VAULT_API_KEY_NAME, exc)
+        return ""
+
 
 # Shared async HTTP client — reused across requests for connection pooling
 _client: httpx.AsyncClient | None = None
@@ -39,11 +71,23 @@ _client: httpx.AsyncClient | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _client
+    global _client, LLM_API_KEY
     _client = httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=120, write=30, pool=5))
+
+    # Prefer an explicit LLM_API_KEY; otherwise pull it from the vault once at
+    # startup so requests never pay a vault round-trip. to_thread keeps the
+    # synchronous vault client off the event loop.
+    if not LLM_API_KEY:
+        LLM_API_KEY = await asyncio.to_thread(_api_key_from_vault)
+        if LLM_API_KEY:
+            log.info("LLM_API_KEY loaded from vault %s/%s.", VAULT_CONTEXT, VAULT_API_KEY_NAME)
+
     log.info("Backend started. Proxying to: %s", LLM_BASE_URL)
     if not LLM_API_KEY:
-        log.warning("LLM_API_KEY is not set — requests to the upstream provider will likely fail.")
+        log.warning(
+            "No LLM_API_KEY: set it directly or configure VAULT_URL + VAULT_TOKEN. "
+            "Requests to the upstream provider will fail."
+        )
     yield
     await _client.aclose()
 
