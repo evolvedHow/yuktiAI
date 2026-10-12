@@ -1,17 +1,16 @@
 /**
  * App — top-level composition root.
  *
- * Owns the three modals (Settings, Key Vault, topic editor) and wires the
- * useDebate hook to the Sidebar and DebateTranscript. Also renders the persistent
- * setup-warning banner that appears until the LLM is configured; its shortcut
- * button opens the password-gated Key Vault directly.
+ * Owns the Settings and topic-editor modals and wires the useDebate hook to the
+ * Sidebar and DebateTranscript. Also renders the persistent setup-warning banner
+ * that appears until the LLM gateway is configured; its shortcut button opens
+ * Settings directly.
  */
 import { useState } from "react";
 import { useDebate } from "./hooks/useDebate";
 import { Sidebar } from "./components/Sidebar";
 import { DebateTranscript } from "./components/DebateTranscript";
 import { SettingsModal } from "./components/SettingsModal";
-import { KeyVaultModal } from "./components/KeyVaultModal";
 import { CustomTopicModal } from "./components/CustomTopicModal";
 import { describeConfigProblem } from "./debate/gateway";
 import { Topic } from "./types";
@@ -57,7 +56,6 @@ export default function App() {
   } = useDebate();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [vaultOpen, setVaultOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   /** The managed topic being edited; null/undefined = adding a new one. */
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
@@ -132,10 +130,10 @@ export default function App() {
             <span>⚙️</span>
             <span>{configProblem}</span>
             <button
-              onClick={() => setVaultOpen(true)}
+              onClick={() => setSettingsOpen(true)}
               className="ml-auto shrink-0 font-medium underline decoration-dotted hover:text-amber-950"
             >
-              🔑 Open Key Vault
+              ⚙️ Open Settings
             </button>
           </div>
         )}
@@ -178,16 +176,6 @@ export default function App() {
           backendStatus={backendStatus}
           onSave={updateSettings}
           onClose={() => setSettingsOpen(false)}
-          onOpenVault={() => setVaultOpen(true)}
-        />
-      )}
-
-      {/* Key Vault modal */}
-      {vaultOpen && (
-        <KeyVaultModal
-          settings={settings}
-          onSave={updateSettings}
-          onClose={() => setVaultOpen(false)}
         />
       )}
 

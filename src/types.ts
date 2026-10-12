@@ -335,9 +335,6 @@ export interface GatewayInfo {
   requiresPasscode: boolean;
 }
 
-/** Which key the gateway should spend on our behalf. */
-export type KeySource = "server" | "own";
-
 // ── Response reveal (typewriter) ─────────────────────────────────────────────
 
 export interface TypewriterSettings {
@@ -371,13 +368,6 @@ export interface FactCheckSettings {
 // ── LLM settings (persisted to localStorage) ─────────────────────────────────
 
 export interface LLMSettings {
-  /** OpenAI-compatible base URL, no trailing slash.
-   *  e.g. https://api.groq.com/openai/v1
-   *       https://api.openai.com/v1
-   *       https://openrouter.ai/api/v1
-   *  Ignored when a gateway is configured. */
-  baseUrl: string;
-  apiKey: string;
   model: string;
   maxTokensPerTurn: number;
   /** Pause between one agent's turn ending and the next LLM call starting. */
@@ -385,17 +375,15 @@ export interface LLMSettings {
   /** When false, the debate waits for a manual click instead of counting down. */
   autoAdvance: boolean;
   maxTurns: number;
-  /** Gateway URL, no trailing slash — a Cloudflare Worker (see worker/) or the
-   *  Python backend. When set, all LLM calls are proxied through it and the key
-   *  is held server-side. Leave empty for direct-to-provider mode.
-   *  e.g. http://localhost:8787  or  https://yukti-llm-gateway.you.workers.dev */
+  /** Gateway URL, no trailing slash — a Cloudflare Worker (see worker-env) that
+   *  holds every provider key server-side and injects it per call. All LLM work
+   *  is proxied through it; nothing secret lives in the browser.
+   *  e.g. https://worker-env-vault.vish-ganapathy.workers.dev */
   backendUrl: string;
   /** Which of the gateway's provider profiles to use. */
   gatewayProviderId: string;
   /** Sent as X-Yukti-Passcode when the gateway requires one. */
   gatewayPasscode: string;
-  /** "server" spends the gateway's pre-defined key; "own" sends apiKey instead. */
-  keySource: KeySource;
   /**
    * When creating a topic, run the raw prompt through the topic-review agent
    * (public/agents/topic-reviewer.md) to refine, expand and keyword it before it
@@ -435,8 +423,6 @@ function envBool(raw: string | undefined, fallback: boolean): boolean {
 }
 
 export const DEFAULT_SETTINGS: LLMSettings = {
-  baseUrl:           envStr(import.meta.env.VITE_LLM_BASE_URL, "https://api.groq.com/openai/v1"),
-  apiKey:            envStr(import.meta.env.VITE_LLM_API_KEY, ""),
   model:             envStr(import.meta.env.VITE_LLM_MODEL, "groq/compound-mini"),
   maxTokensPerTurn:  envNum(import.meta.env.VITE_MAX_TOKENS, 420),
   interTurnDelayMs:  envNum(import.meta.env.VITE_TURN_DELAY_MS, 8000),
@@ -445,7 +431,6 @@ export const DEFAULT_SETTINGS: LLMSettings = {
   backendUrl:        envStr(import.meta.env.VITE_BACKEND_URL, ""),
   gatewayProviderId: envStr(import.meta.env.VITE_GATEWAY_PROVIDER, ""),
   gatewayPasscode:   "",
-  keySource:         "server",
   reviewNewTopics:   envBool(import.meta.env.VITE_REVIEW_NEW_TOPICS, true),
   tone:              DEFAULT_TOPIC_TONE,
   typewriter: {
@@ -460,31 +445,3 @@ export const DEFAULT_SETTINGS: LLMSettings = {
     maxRedos:        envNum(import.meta.env.VITE_MAX_REDOS, 1),
   },
 };
-
-export const PROVIDER_PRESETS: { label: string; baseUrl: string; placeholder: string }[] = [
-  {
-    label: "Groq (free)",
-    baseUrl: "https://api.groq.com/openai/v1",
-    placeholder: "groq/compound-mini",
-  },
-  {
-    label: "OpenAI",
-    baseUrl: "https://api.openai.com/v1",
-    placeholder: "gpt-4o-mini",
-  },
-  {
-    label: "OpenRouter",
-    baseUrl: "https://openrouter.ai/api/v1",
-    placeholder: "meta-llama/llama-3.3-70b-instruct",
-  },
-  {
-    label: "Together AI",
-    baseUrl: "https://api.together.xyz/v1",
-    placeholder: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-  },
-  {
-    label: "Custom / Local",
-    baseUrl: "http://localhost:11434/v1",
-    placeholder: "llama3.2",
-  },
-];

@@ -9,8 +9,8 @@
  *
  * Tone is not part of this flow — it is a single global, real-time user setting.
  *
- * The review runs through the same configured LLM (or gateway) as the debates do, so it
- * is unavailable until an API key is configured — the modal tells the user exactly that.
+ * The review runs through the same gateway as the debates do, so it is
+ * unavailable until the gateway responds — the modal tells the user exactly that.
  */
 
 import { LLMSettings } from "../types";
@@ -67,7 +67,6 @@ export async function reviewTopicPrompt(req: TopicReviewRequest): Promise<TopicR
   let raw = "";
   for await (const token of streamChat({
     baseUrl: endpoint.baseUrl,
-    apiKey: endpoint.apiKey,
     model: req.settings.model,
     messages: [
       { role: "system", content: persona },

@@ -118,7 +118,7 @@ export function CustomTopicModal({
   }
 
   const reviewHint = !configReady
-    ? "AI review is unavailable until an API key is configured (Settings → 🔑 Key Vault) — saving as-is."
+    ? "AI review is unavailable until the LLM gateway is configured (Settings) — saving as-is."
     : reviewEnabled
       ? "New topics are sent through the topic-review agent, which sharpens the title and adds search keywords. You approve its edits before saving."
       : null;

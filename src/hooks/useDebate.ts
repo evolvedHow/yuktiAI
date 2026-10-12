@@ -524,7 +524,7 @@ export function useDebate() {
         const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(4500) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       } catch {
-        setError(`Gateway unreachable at ${url}. Check the address in Settings → 🔑 Key Vault, or switch to Direct mode.`);
+        setError(`Gateway unreachable at ${url}. Check the address in Settings, then try again.`);
         return;
       }
     }
@@ -662,8 +662,8 @@ export function useDebate() {
       },
     };
 
-    // runDebate resolves the endpoint per call (direct provider vs. gateway) —
-    // see resolveEndpoint in debate/gateway.ts.
+    // runDebate resolves the endpoint per call — see resolveEndpoint in
+    // debate/gateway.ts. Every call goes through the gateway.
     try {
       await runDebate(effective, personas, settings, callbacks, control, getSessionStyle(), {
         evidencePolicy: evidencePolicyRef.current,

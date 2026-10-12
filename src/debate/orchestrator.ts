@@ -178,7 +178,6 @@ async function streamTurn(
   try {
     for await (const token of streamChat({
       baseUrl: endpoint.baseUrl,
-      apiKey: endpoint.apiKey,
       model: deps.settings.model,
       messages,
       maxTokens: deps.settings.maxTokensPerTurn,

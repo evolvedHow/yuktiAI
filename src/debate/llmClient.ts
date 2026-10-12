@@ -14,8 +14,6 @@ export interface ChatMessage {
 export interface ChatRequest {
   /** Base URL ending at the version segment, no trailing slash. */
   baseUrl: string;
-  /** Sent as `Authorization: Bearer`. Empty when the gateway holds the key. */
-  apiKey: string;
   model: string;
   messages: ChatMessage[];
   maxTokens: number;
@@ -38,7 +36,6 @@ export async function* streamChat(req: ChatRequest): AsyncGenerator<string> {
     "X-Title": "YuktiAI Debate Arena",
     ...req.headers,
   };
-  if (req.apiKey) headers.Authorization = `Bearer ${req.apiKey}`;
 
   const res = await fetch(`${req.baseUrl}/chat/completions`, {
     method: "POST",

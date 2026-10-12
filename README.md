@@ -4,8 +4,9 @@ A client-side AI-powered debate arena. Three AI agents (Moderator, Advocate,
 Critic) debate civic and policy topics with token streaming, a typewriter
 reveal, audience Q&A injection, and one-click Markdown/PDF export.
 
-**The static site deploys to GitHub Pages. An optional Cloudflare Worker holds
-the API keys, so nothing secret ships in the bundle.**
+**The static site deploys to GitHub Pages. All LLM calls are proxied through a
+single shared gateway (the worker-env Cloudflare Worker), which holds the
+provider keys server-side — nothing secret ships in the bundle.**
 
 ---
 
@@ -20,7 +21,7 @@ yuktiAI/
 ├── src/
 │   ├── debate/
 │   │   ├── llmClient.ts      ← Streaming fetch wrapper (OpenAI-compatible)
-│   │   ├── gateway.ts        ← Direct-vs-gateway endpoint resolution
+│   │   ├── gateway.ts        ← Gateway endpoint resolution + providers fetch
 │   │   ├── typewriter.ts     ← Paced reveal queue
 │   │   ├── styles.ts         ← Style loader
 │   │   └── orchestrator.ts   ← Client-side debate loop + persona loader
@@ -29,85 +30,56 @@ yuktiAI/
 │   │   ├── Markdown.tsx      ← Hardened markdown renderer for agent output
 │   │   └── …                 ← Sidebar, MessageCard, Transcript, Settings
 │   └── utils/                ← Markdown + PDF export
-├── worker/                   ← Cloudflare Worker key gateway (see worker/README.md)
-├── backend/                  ← Alternative Python/FastAPI proxy
 └── .github/workflows/deploy.yml   ← Auto-deploy to GitHub Pages
 ```
 
-### Where the API key lives
+The gateway itself lives in the separate
+[`codebox/worker-env`](https://github.com/evolvedHow/worker-env) repo, deployed
+to `https://worker-env-vault.vish-ganapathy.workers.dev`.
 
-Two modes, switchable at runtime in **Settings**:
+### Where the API keys live
 
-| Mode | How it works | Use when |
-|---|---|---|
-| **Gateway** *(recommended)* | The browser calls the [Cloudflare Worker](worker/README.md), which injects a key it reads from the central worker-env vault. | Anything public or shared. |
-| **Direct** | The browser calls the provider itself with a key from `localStorage`. | Local development, personal use. |
+Server-side, in the gateway. The browser never holds a key; it only picks a
+**provider** from the gateway's public `GET /providers` catalogue and sends the
+chosen provider id on each request (`X-Yukti-Provider`) plus, when the gateway is
+deployed with one, a **passcode** (`X-Yukti-Passcode`). The gateway injects the
+matching `KEY_<PROVIDER>` from its CSV vault.
 
-In gateway mode users pick a **provider profile** (Groq, OpenAI, Anthropic, …).
-Profiles the gateway has a key for are marked *key on gateway*; for the rest —
-or when a user prefers their own account — Settings offers **My own key**, which
-is forwarded through the gateway and never stored server-side.
-
+Profiles the gateway has a key for are selectable in **Settings → Provider**.
 Adding another key later needs no frontend change: add `KEY_<PROVIDER>` to the
-vault context `yuktiai` (see [worker/README.md](worker/README.md)) and it appears
-in the picker on the next page load.
+vault context `yuktiai` in worker-env and it appears in the picker on the next
+page load.
 
-### The Key Vault
+### Gateway access
 
-API keys, gateway credentials and models are edited behind a password-gated
-**🔑 Key Vault** (Settings → Key Vault). The vault password ships with the site
-in [`public/config/vault.yaml`](public/config/vault.yaml) — it's obfuscation
-against casual fiddling, not a hardened secret — and the whole vault can be
-disabled by emptying that password. Nothing entered there is sent anywhere
-except, at debate time, to the configured provider or gateway.
+Because the gateway now spends real credits on the site's behalf, its chat and
+link-verification routes can be gated behind a passphrase. If the deploy has an
+`ACCESS_PASSCODE` secret set in its `yuktiai` vault context, **Settings** shows
+the **Gateway passcode** field and starting a debate is blocked until it
+matches. The `/providers` catalogue stays public, so the picker renders before
+any passcode is asked for.
 
-**Operating the vault:**
+There is no client-side vault, password, or stored key: the passcode lives only
+in that browser's `localStorage`, and the keys never leave the gateway.
 
-1. **Open it** — click **Settings** (⚙️ in the sidebar) → **🔑 Key Vault**, or
-   click the **🔑 Open Key Vault** button in the amber setup banner that shows
-   while no LLM is configured. `Esc` or clicking the backdrop closes it.
-2. **Unlock** — if a `password:` is set in `public/config/vault.yaml`, enter it.
-   With a blank password the vault opens straight away. The unlock lasts for the
-   browser session (**Lock vault** re-locks it, a browser restart locks it too).
-3. **Choose who pays.** Either:
-   - **Gateway mode** — paste the gateway URL (your Cloudflare Worker), pick the
-     **Provider profile** (groq, openai, …) and **Provider model**, add the
-     gateway's **passcode** if it requires one, and optionally a personal
-     **My own key** to forward instead of the gateway's server-held key.
-   - **Direct mode** — leave the gateway URL blank (or clear it) and enter the
-     provider **base URL**, a **Direct API key**, and the **model**.
-4. **Save** — everything is written to this browser's `localStorage`
-   (`SettingsModal` reads it back on every page load). The **Save keys** button
-   confirms; nothing is transmitted at save-time.
-5. **Change or disable the password** — edit `password:` in
-   `public/config/vault.yaml` (an empty string disables the lock) and redeploy.
-   The default password shown there is deliberately public: it guards against
-   casual fiddling on a shared page, not against determined users.
+**Starting a debate is blocked until the gateway is configured.** If
+`VITE_BACKEND_URL` was baked in at build time, that means "enter the passcode".
+With no gateway URL at all, starting shows the precise fix required and the
+header keeps a persistent warning banner with a shortcut to **Settings**. The
+topic-review agent and claim-reviewer are gated the same way — no LLM call ever
+happens before the gateway answers.
 
-> Default vault password: `yukti-vault-2026` — change it before sharing the
-> deployed site widely.
+**One gateway serves every provider.** The provider is selected by the
+`X-Yukti-Provider` header (or a `provider` field in the request body), and each
+provider's key is a separate entry in the worker-env vault (`KEY_GROQ`,
+`KEY_OPENAI`, `KEY_ANTHROPIC`, …). New providers are added by adding a vault key
+plus an optional `EXTRA_PROVIDERS` JSON variable — no code change, no redeploy of
+the app.
 
-**Starting a debate is blocked until an LLM is configured.** With no key or
-gateway URL, starting shows the precise fix required and the header keeps a
-persistent warning banner with a shortcut to the vault. The topic-review agent
-and claim-reviewer are gated the same way — no LLM call ever happens before keys
-exist.
-
-**One Worker serves every provider — there is no per-provider Worker.** The
-single Worker is selected by the `X-Yukti-Provider` header (or a `provider`
-field in the request body), and each provider's key is a separate entry in the
-central **worker-env vault** named after the profile (`KEY_GROQ`, `KEY_OPENAI`,
-`KEY_ANTHROPIC`, …). New providers are added by adding a vault key plus an
-optional `EXTRA_PROVIDERS` JSON variable — no code change, no redeploy of the
-app, and no second Worker. The gateway itself holds only `VAULT_URL` and
-`VAULT_TOKEN`; all provider keys stay in the vault.
-
-**The Worker itself is not hardcoded anywhere in the app.** The frontend only
-ever reads the gateway URL from `VITE_BACKEND_URL` at build time or from
-**Settings → Key Gateway** at runtime; point that at any deployment you control
-(your own Worker, a fork, a regional endpoint). Blank it and the app falls back
-to direct-to-provider mode. Similarly, per-profile provider base URLs can be
-overridden per deployment (`BASE_URL_<PROVIDER>`), so nothing in the bundle ties
+**The gateway is not hardcoded anywhere in the app.** The frontend only ever
+reads the gateway URL from `VITE_BACKEND_URL` at build time or from
+**Settings → Provider Gateway** at runtime; point that at any deployment you
+control (worker-env, a fork, a regional endpoint). Nothing in the bundle ties
 you to a specific host.
 
 ---
@@ -121,24 +93,20 @@ npm install
 npm run dev          # → http://localhost:5173
 ```
 
-Then open **Settings** (⚙️ icon in the sidebar) and either paste an API key
-(direct mode) or point **Key Gateway** at a running Worker. Select a topic from
-the sidebar and the debate begins.
+Then open **Settings** (⚙️ icon in the sidebar), pick a provider the gateway has
+a key for (the deploy above forwards them), and enter the gateways passcode if
+one is required. Select a topic from the sidebar and the debate begins.
 
-### Running the key gateway locally
+### Pointing at a gateway locally
 
-```bash
-cd worker && npm install && cp .dev.vars.example .dev.vars
+Set `VITE_BACKEND_URL` in `.env.local` before `npm run dev`:
+
+```env
+VITE_BACKEND_URL=https://worker-env-vault.vish-ganapathy.workers.dev
 ```
 
-Add at least one key to `.dev.vars`, then:
-
-```bash
-npx wrangler dev
-```
-
-Set **Settings → Key Gateway** to `http://localhost:8787`. Full setup and deploy
-instructions are in [worker/README.md](worker/README.md).
+No local Worker needed — the gateway is deployed from the separate
+[`worker-env`](https://github.com/evolvedHow/worker-env) repo.
 
 ---
 
@@ -151,14 +119,15 @@ instructions are in [worker/README.md](worker/README.md).
 3. If deploying to a *project page* (e.g. `username.github.io/yuktiAI`), add a
    repository variable: **Settings → Variables → Actions → New** →
    `VITE_BASE_PATH` = `/yuktiAI`
-4. Deploy the gateway (`cd worker && npx wrangler deploy`) and add its URL as the
-   repository variable `VITE_BACKEND_URL`, so visitors get working keys with no
-   setup. Skip this only if every visitor will bring their own key.
+4. Deploy the gateway from the `worker-env` repo (`npm run deploy`) and add its
+   URL as the repository variable `VITE_BACKEND_URL`, so visitors get working
+   keys with no setup. Also set `VITE_GATEWAY_PROVIDER` to the default provider
+   (e.g. `anthropic`). Optionally set `VITE_LLM_MODEL`.
 5. Push to `main` — the workflow builds and deploys automatically.
 
-> Setting `VITE_LLM_API_KEY` instead embeds that key in the published
-> JavaScript, where anyone can read it. It's fine for a private page and a bad
-> idea for a public one.
+> Nothing secret is ever baked into the bundle — provider keys stay on the
+> gateway. If you want a passphrase gate on the gateway's paid routes, set
+> `ACCESS_PASSCODE` in the gateway's `yuktiai` vault context and redeploy it.
 
 ### User/org page (`username.github.io`)
 
@@ -203,7 +172,7 @@ sidebar.
 the title and adds search keywords. The refined version is shown back and must be
 approved before saving — the agent edits the user's words, never silently replaces their
 intent. Auto-review on save (toggle in Settings → New Topics, default on) is skipped
-automatically until an LLM is configured; the ✨ Review &amp; refine button in the editor
+automatically until the gateway responds; the ✨ Review &amp; refine button in the editor
 runs it on demand. Reviewed topics can be searched by their keywords in the sidebar
 search box.
 
@@ -229,17 +198,17 @@ reader.
 
 ## When the LLM won't talk
 
-A failed call (no key, wrong key, dead gateway, rate limit) shows up as an error
-card instead of a speech — and the debate **stops rather than replaying that
-card for every remaining turn**.
+A failed call (no gateway configured, wrong passcode, dead gateway, rate limit)
+shows up as an error card instead of a speech — and the debate **stops rather
+than replaying that card for every remaining turn**.
 
 - A call that dies on the wire is retried up to twice (status shows
   *"Connection failed — retrying…"*), so one blip doesn't kill a debate.
 - If it keeps failing, the debate ends after that turn; no more LLM calls are
   made and no error cards are churned out.
-- Starting is guarded too: with **no key at all** the debate won't begin, and if
-  a gateway URL is configured it is pinged first, so an unreachable gateway is
-  reported up front instead of as fourteen identical errors.
+- Starting is guarded too: with **no working gateway** the debate won't begin,
+  and if a gateway URL is configured it is pinged first, so an unreachable
+  gateway is reported up front instead of as fourteen identical errors.
 
 ---
 
@@ -400,25 +369,19 @@ welcome and which line still must not be crossed. `evidence-policy.md` and
 
 ## Supported LLM Providers
 
-| Provider | Base URL | Notes |
-|---|---|---|
-| **Groq** (recommended) | `https://api.groq.com/openai/v1` | Free tier, very fast |
-| **OpenAI** | `https://api.openai.com/v1` | GPT-4o, GPT-4o-mini |
-| **OpenRouter** | `https://openrouter.ai/api/v1` | Routes to 100+ models |
-| **Together AI** | `https://api.together.xyz/v1` | Open models |
-| **Local Ollama** | `http://localhost:11434/v1` | Requires `OLLAMA_ORIGINS=*` |
-| **Any OpenAI-compatible** | custom URL | Just paste the base URL |
-
-In gateway mode the same providers are available as pre-configured profiles,
-plus **Anthropic** and **Cerebras**. See
-[worker/src/providers.ts](worker/src/providers.ts).
+The gateway ships pre-configured profiles for **Groq**, **OpenAI**, **Anthropic**,
+**OpenRouter**, **Together AI**, **Cerebras** and **Google** — see
+[`worker/providers.py`](https://github.com/evolvedHow/worker-env/blob/master/worker/providers.py)
+in the worker-env repo. Only providers the gateway holds a key for
+(`KEY_<PROVIDER>` in the `yuktiai` vault context) are selectable in
+**Settings → Provider**.
 
 ---
 
 ## Keyboard / UX Notes
 
 - **Enter** in the question field sends the question (Shift+Enter for newline).
-- **Esc** closes the topic editor and the Key Vault; clicking the backdrop closes either dialog.
+- **Esc** closes the Settings and topic editor; clicking the backdrop closes either dialog.
 - The **Export PDF** button appears after the debate concludes.
 - Clicking a new topic mid-debate shows a confirmation prompt before stopping.
 - **Request Conclusion** flags the Moderator to wrap up on its next scheduled turn —
@@ -435,8 +398,10 @@ npm run preview    # preview production build locally
 npm run lint       # TypeScript type-check
 ```
 
-The gateway is a separate package:
+The gateway is a separate package in the `worker-env` repo:
 
 ```bash
-cd worker && npm install && npx wrangler dev
+cd ~/codebox/worker-env && uv run ruff check worker tests && uv run pytest
+npm run dev        # wrangler dev, http://127.0.0.1:8787
+npm run deploy     # push to https://worker-env-vault.vish-ganapathy.workers.dev
 ```

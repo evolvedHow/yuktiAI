@@ -1,6 +1,7 @@
 # Builds the static site and deploys it to GitHub Pages on every push to `main`.
-# VITE_BACKEND_URL etc. come in as repository variables at build time; secrets are
-# only used for the direct-provider defaults. See README.md → "Deploy to GitHub Pages".
+# VITE_BACKEND_URL etc. come in as repository variables at build time; nothing
+# secret is ever baked into the bundle — the gateway holds every provider key
+# server-side. See README.md → "Deploy to GitHub Pages".
 name: Deploy to GitHub Pages
 
 on:
@@ -32,19 +33,14 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # ── Key gateway (recommended) ──────────────────────────────────────
-          # URL of the Cloudflare Worker in worker/. Baking this in means users
-          # get working keys with no setup, and no key ships in the bundle.
+          # ── LLM gateway (the only mode) ───────────────────────────────────
+          # URL of the shared worker-env gateway. Baking this in means users get
+          # working keys with no setup, and no key ships in the bundle.
           # Store as a repository *variable* — it isn't secret.
           VITE_BACKEND_URL:       ${{ vars.VITE_BACKEND_URL }}
           VITE_GATEWAY_PROVIDER:  ${{ vars.VITE_GATEWAY_PROVIDER }}
-
-          # ── Direct provider mode (only when no gateway is set) ─────────────
-          # WARNING: VITE_LLM_API_KEY is embedded in the published JavaScript and
-          # is readable by anyone who visits the site. Prefer the gateway above.
-          VITE_LLM_BASE_URL:      ${{ secrets.VITE_LLM_BASE_URL }}
-          VITE_LLM_API_KEY:       ${{ secrets.VITE_LLM_API_KEY }}
-          VITE_LLM_MODEL:         ${{ secrets.VITE_LLM_MODEL }}
+          # Model the gateway uses if the user doesn't override it.
+          VITE_LLM_MODEL:         ${{ vars.VITE_LLM_MODEL }}
 
           # ── Pacing / reveal defaults ───────────────────────────────────────
           VITE_MAX_TOKENS:        ${{ vars.VITE_MAX_TOKENS }}

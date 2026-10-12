@@ -1,12 +1,15 @@
 /**
- * Settings modal — configure where LLM calls go, which key pays for them,
- * the pause between turns, and how fast responses are typed onto the screen.
+ * Settings modal — configure which gateway provider pays for the debates, pick
+ * the model, set the passcode, and tune pacing, accuracy and reveal.
  * All values are saved to localStorage.
+ *
+ * Keys are always held server-side by the gateway — the provider list comes
+ * from its public GET /providers and only keyed providers are selectable.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  DEFAULT_SETTINGS, GatewayInfo, KeySource, LLMSettings,
-  PROVIDER_PRESETS, TYPEWRITER_PRESETS,
+  DEFAULT_SETTINGS, GatewayInfo, LLMSettings,
+  TYPEWRITER_PRESETS,
 } from "../types";
 import { BackendStatus } from "../hooks/useDebate";
 import { fetchGatewayInfo, normalizeGatewayUrl } from "../debate/gateway";
@@ -16,13 +19,11 @@ interface Props {
   backendStatus: BackendStatus;
   onSave: (patch: Partial<LLMSettings>) => void;
   onClose: () => void;
-  /** Opens the password-gated Key Vault in front of this modal. */
-  onOpenVault: () => void;
 }
 
 type ProbeStatus = "idle" | "testing" | "ok" | "fail";
 
-export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpenVault }: Props) {
+export function SettingsModal({ settings, backendStatus, onSave, onClose }: Props) {
   const [draft, setDraft] = useState<LLMSettings>({ ...settings });
   const [probeStatus, setProbeStatus] = useState<ProbeStatus>("idle");
   const [info, setInfo] = useState<GatewayInfo | null>(null);
@@ -82,8 +83,6 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
       ...prev,
       gatewayProviderId: id,
       model: provider?.defaultModel || prev.model,
-      // A provider with no server key can only work with the user's own key.
-      keySource: provider && !provider.hasServerKey ? "own" : prev.keySource,
     }));
   }
 
@@ -97,20 +96,16 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
     setProbeStatus("idle");
   }
 
-  function applyPreset(baseUrl: string, placeholder: string) {
-    setDraft((prev) => ({ ...prev, baseUrl, model: placeholder }));
-  }
-
+  // Only providers the gateway can actually pay for are selectable.
+  const pickable = info?.providers.filter((p) => p.hasServerKey) ?? [];
   const selectedProvider = info?.providers.find((p) => p.id === draft.gatewayProviderId);
-  const needsOwnKey = usingGateway && draft.keySource === "own";
-  const passcodeRequired = info?.requiresPasscode ?? false;
 
   const statusPill = (() => {
     if (!usingGateway) return null;
     if (probeStatus === "testing") return <Pill color="gray">Checking…</Pill>;
     if (probeStatus === "ok") {
-      const withKeys = info?.providers.filter((p) => p.hasServerKey).length ?? 0;
-      return <Pill color="green">{withKeys} key{withKeys === 1 ? "" : "s"} ready</Pill>;
+      const count = pickable.length;
+      return <Pill color="green">{count} key{count === 1 ? "" : "s"} ready</Pill>;
     }
     if (probeStatus === "fail") return <Pill color="red">Unreachable</Pill>;
     if (backendStatus === "online") return <Pill color="green">Online</Pill>;
@@ -130,22 +125,13 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
         {/* Header */}
         <div className="sticky top-0 bg-white flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
           <h2 className="text-base font-semibold text-ink">Settings</h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onOpenVault}
-              className="text-xs font-medium rounded-lg px-3 py-1.5 border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors"
-              title="The password-gated home of API keys and gateway credentials"
-            >
-              🔑 Key Vault
-            </button>
-            <button
-              onClick={onClose}
-              className="text-muted hover:text-ink p-1 rounded"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="text-muted hover:text-ink p-1 rounded"
+            aria-label="Close"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="px-6 py-5 space-y-5">
@@ -154,7 +140,7 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
           <div className="rounded-xl border border-border bg-gray-50 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-                Key Gateway
+                Provider Gateway
               </p>
               {statusPill}
             </div>
@@ -163,31 +149,29 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
               type="url"
               value={draft.backendUrl}
               onChange={(e) => set("backendUrl", e.target.value)}
-              placeholder="https://yukti-llm-gateway.you.workers.dev"
+              placeholder="https://worker-env-vault.vish-ganapathy.workers.dev"
               className={inputCls}
             />
 
             <p className="text-[11px] text-muted leading-relaxed">
-              {usingGateway
-                ? "Calls are routed through this gateway, which holds the API keys. Nothing secret is stored in your browser."
-                : "Leave blank to call providers directly from the browser with your own key. Point this at the Cloudflare Worker in worker/ to keep keys off the client."}
+              Every LLM call is proxied through this gateway, which holds the API keys
+              server-side. Nothing secret is stored in your browser. Normally this is
+              baked in at build time — you only need to touch it if the gateway moves.
             </p>
 
-            {usingGateway && passcodeRequired && (
-              <Field label="Gateway passcode">
-                <input
-                  type="password"
-                  value={draft.gatewayPasscode}
-                  onChange={(e) => set("gatewayPasscode", e.target.value)}
-                  placeholder="Required by this gateway"
-                  autoComplete="off"
-                  className={inputCls}
-                />
-              </Field>
-            )}
+            <Field label="Gateway passcode">
+              <input
+                type="password"
+                value={draft.gatewayPasscode}
+                onChange={(e) => set("gatewayPasscode", e.target.value)}
+                placeholder="Required once the gateway sets ACCESS_PASSCODE"
+                autoComplete="off"
+                className={inputCls}
+              />
+            </Field>
           </div>
 
-          {/* ── Gateway mode: provider + key source ──────────────────────── */}
+          {/* ── Provider + model ─────────────────────────────────────────── */}
           {usingGateway && (
             <div className="space-y-4">
               {info && info.providers.length > 0 ? (
@@ -197,64 +181,35 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
                     onChange={(e) => selectGatewayProvider(e.target.value)}
                     className={inputCls}
                   >
-                    {info.providers.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.label}
-                        {p.hasServerKey ? "  ·  key on gateway" : "  ·  needs your key"}
-                      </option>
-                    ))}
+                    {info.providers.map((p) => {
+                      const disabled = !p.hasServerKey;
+                      return (
+                        <option key={p.id} value={p.id} disabled={disabled}>
+                          {p.label}
+                          {disabled ? "  ·  no key on gateway" : "  ·  key on gateway"}
+                        </option>
+                      );
+                    })}
                   </select>
-                  <p className="text-[11px] text-muted mt-1">
-                    {selectedProvider?.hasServerKey
-                      ? "The gateway has a pre-defined key for this provider."
-                      : "No key configured on the gateway for this provider — supply your own below."}
-                  </p>
+                  {pickable.length === 0 ? (
+                    <p className="text-[11px] text-red-600 mt-1">
+                      This gateway has no provider keys configured. Add KEY_&lt;provider&gt;
+                      secrets server-side, or point at a gateway that does.
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-muted mt-1">
+                      {selectedProvider?.hasServerKey
+                        ? "The gateway holds a pre-defined key for this provider — no key needed on your side."
+                        : "Pick a provider the gateway has a key for."}
+                    </p>
+                  )}
                 </Field>
               ) : (
                 <p className="text-[11px] text-muted">
                   {probeStatus === "fail"
-                    ? "Could not read the provider list from this gateway. It may be offline, or it may be the Python backend, which has a single fixed provider."
+                    ? "Could not read the provider list from this gateway. Check the URL and try again."
                     : "Reading the provider list…"}
                 </p>
-              )}
-
-              {/* Only offered by gateways that advertise profiles — the Python
-                  backend always spends its own key regardless. */}
-              {info && (
-                <Field label="Which key pays for this?">
-                  <div className="flex rounded-lg border border-border overflow-hidden text-xs">
-                    <KeySourceButton
-                      active={draft.keySource === "server"}
-                      disabled={Boolean(selectedProvider) && !selectedProvider?.hasServerKey}
-                      onClick={() => set("keySource", "server" as KeySource)}
-                    >
-                      Gateway's key
-                    </KeySourceButton>
-                    <KeySourceButton
-                      active={draft.keySource === "own"}
-                      onClick={() => set("keySource", "own" as KeySource)}
-                    >
-                      My own key
-                    </KeySourceButton>
-                  </div>
-                </Field>
-              )}
-
-              {needsOwnKey && (
-                <Field label="API Key">
-                  <input
-                    type="password"
-                    value={draft.apiKey}
-                    onChange={(e) => set("apiKey", e.target.value)}
-                    placeholder="sk-…"
-                    autoComplete="off"
-                    className={inputCls}
-                  />
-                  <p className="text-[11px] text-muted mt-1">
-                    Kept in this browser's localStorage and forwarded through the gateway to the
-                    provider. The gateway does not store it.
-                  </p>
-                </Field>
               )}
 
               <Field label="Model">
@@ -271,69 +226,6 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
                     {selectedProvider.models.map((m) => <option key={m} value={m} />)}
                   </datalist>
                 )}
-              </Field>
-            </div>
-          )}
-
-          {/* ── Direct mode: provider settings ───────────────────────────── */}
-          {!usingGateway && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-                  Provider Preset
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {PROVIDER_PRESETS.map((p) => (
-                    <button
-                      key={p.baseUrl}
-                      onClick={() => applyPreset(p.baseUrl, p.placeholder)}
-                      className={[
-                        "text-xs rounded-lg px-3 py-1.5 border transition-colors",
-                        draft.baseUrl === p.baseUrl
-                          ? "border-moderator-avatar bg-moderator-bg text-moderator-text"
-                          : "border-border text-muted hover:bg-gray-50",
-                      ].join(" ")}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <Field label="API Base URL">
-                <input
-                  type="url"
-                  value={draft.baseUrl}
-                  onChange={(e) => set("baseUrl", e.target.value)}
-                  placeholder="https://api.groq.com/openai/v1"
-                  className={inputCls}
-                />
-                <p className="text-[11px] text-muted mt-1">OpenAI-compatible endpoint (no trailing slash)</p>
-              </Field>
-
-              <Field label="API Key">
-                <input
-                  type="password"
-                  value={draft.apiKey}
-                  onChange={(e) => set("apiKey", e.target.value)}
-                  placeholder="sk-…"
-                  autoComplete="off"
-                  className={inputCls}
-                />
-                <p className="text-[11px] text-muted mt-1">
-                  Stored in your browser's localStorage only — never sent anywhere except the LLM
-                  provider you configure.
-                </p>
-              </Field>
-
-              <Field label="Model">
-                <input
-                  type="text"
-                  value={draft.model}
-                  onChange={(e) => set("model", e.target.value)}
-                  placeholder="groq/compound-mini"
-                  className={inputCls}
-                />
               </Field>
             </div>
           )}
@@ -420,11 +312,10 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
                 checked={draft.factCheck.verifyLinks}
                 onChange={(v) => setFactCheck({ verifyLinks: v })}
                 title="Verify links"
-                disabled={!usingGateway}
               >
-                {usingGateway
-                  ? "Every URL a speaker cites is fetched through the gateway. A link that 404s is struck through in the transcript and the turn is sent back for a redo. This is measured, not guessed."
-                  : "Requires a gateway — a browser cannot fetch arbitrary sites to check them. Set a gateway URL above to enable this."}
+                Every URL a speaker cites is fetched through the gateway. A link that 404s
+                is struck through in the transcript and the turn is sent back for a redo.
+                This is measured, not guessed.
               </Toggle>
 
               <Toggle
@@ -477,8 +368,8 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
               When you save a new topic, its prompt is first passed through the topic-review
               agent (public/agents/topic-reviewer.md), which sharpens the title and adds search
               keywords. The result is shown back to you before anything is
-              saved — your intent is never silently replaced. Skipped automatically until an API
-              key is configured.
+              saved — your intent is never silently replaced. Skipped automatically until the
+              gateway is configured.
             </Toggle>
           </div>
 
@@ -628,33 +519,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <label className="block text-xs font-medium text-ink mb-1">{label}</label>
       {children}
     </div>
-  );
-}
-
-function KeySourceButton({
-  active, disabled, onClick, children,
-}: {
-  active: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={[
-        "flex-1 py-1.5 px-2 transition-colors leading-none border-l border-border first:border-l-0",
-        disabled
-          ? "bg-gray-50 text-muted/50 cursor-not-allowed"
-          : active
-            ? "bg-moderator-bg text-moderator-text font-semibold"
-            : "bg-white text-ink hover:bg-gray-50",
-      ].join(" ")}
-      title={disabled ? "This gateway has no key configured for the selected provider" : undefined}
-    >
-      {children}
-    </button>
   );
 }
 

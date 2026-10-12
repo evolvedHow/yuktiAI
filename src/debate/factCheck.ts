@@ -186,7 +186,6 @@ async function reviewClaims(
   let raw = "";
   for await (const token of streamChat({
     baseUrl: endpoint.baseUrl,
-    apiKey: endpoint.apiKey,
     model: settings.model,
     messages: [
       { role: "system", content: persona },
