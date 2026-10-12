@@ -3,15 +3,17 @@
  *
  * The user types whatever is on their mind ("should we ban crypto ads?"); this runs it
  * through a dedicated persona (public/agents/topic-reviewer.md) that returns a tightened
- * title, neutral framing, search keywords and a suggested tone. The refined result is
- * shown back to the user in the topic editor before anything is saved, so the model edits
- * their words but never silently replaces their intent.
+ * title, neutral framing and search keywords. The refined result is shown back to the
+ * user in the topic editor before anything is saved, so the model edits their words but
+ * never silently replaces their intent.
+ *
+ * Tone is not part of this flow — it is a single global, real-time user setting.
  *
  * The review runs through the same configured LLM (or gateway) as the debates do, so it
  * is unavailable until an API key is configured — the modal tells the user exactly that.
  */
 
-import { LLMSettings, resolveTone, TopicTone } from "../types";
+import { LLMSettings } from "../types";
 import { streamChat } from "./llmClient";
 import { resolveEndpoint } from "./gateway";
 
@@ -19,7 +21,6 @@ export interface TopicReviewResult {
   title: string;
   description: string;
   keywords: string[];
-  tone: TopicTone;
   /** Human note about what the agent changed / thought ambiguous. */
   rationale: string;
 }
@@ -56,7 +57,7 @@ function extractJsonObject(raw: string): Record<string, unknown> {
 export async function reviewTopicPrompt(req: TopicReviewRequest): Promise<TopicReviewResult> {
   const endpoint = resolveEndpoint(req.settings);
   const persona = req.persona.trim() ||
-    "You are a topic intake editor. Turn the user's debate topic into a tight motion, neutral framing, and search keywords. Reply with JSON only: { title, description, keywords, tone, rationale }.";
+    "You are a topic intake editor. Turn the user's debate topic into a tight motion, neutral framing, and search keywords. Reply with JSON only: { title, description, keywords, rationale }.";
 
   const userMessage =
     `Raw debate topic from a user:\n\n---\n${req.title.trim()}\n\n` +
@@ -93,8 +94,7 @@ export async function reviewTopicPrompt(req: TopicReviewRequest): Promise<TopicR
         .filter((k): k is string => typeof k === "string" && k.trim().length > 0)
         .map((k) => k.trim().toLowerCase())
     : [];
-  const tone = resolveTone(typeof parsed.tone === "string" ? (parsed.tone as TopicTone) : undefined);
   const rationale = typeof parsed.rationale === "string" ? parsed.rationale.trim() : "";
 
-  return { title, description, keywords, tone, rationale };
+  return { title, description, keywords, rationale };
 }

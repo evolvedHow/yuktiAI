@@ -2,17 +2,19 @@
  * Topic Editor Modal — add or edit a managed topic.
  *
  * Handles the full life of a user topic:
- *   - Title, description, search keywords, and a tone chosen with radio buttons
- *     (Serious / Jovial / Informal) instead of something baked into the topic.
+ *   - Title, description and search keywords.
  *   - Optional AI "review & refine": the raw prompt is sent to the topic-review
  *     agent (public/agents/topic-reviewer.md), which returns a tightened title,
- *     neutral framing, keywords and a suggested tone. The result is shown back
- *     for approval; the model edits the user's words, never silently replaces
- *     their intent. Skipped automatically when no API key is configured.
+ *     neutral framing and keywords. The result is shown back for approval; the
+ *     model edits the user's words, never silently replaces their intent.
+ *     Skipped automatically when no API key is configured.
  *   - Edit mode pre-fills an existing managed topic in place.
+ *
+ * Tone is deliberately absent here: it is a single global, real-time setting
+ * picked in the sidebar, not a property of any topic.
  */
 import { useEffect, useState } from "react";
-import { resolveTone, Topic, TopicTone, TONE_DEFS } from "../types";
+import { Topic } from "../types";
 import { TopicReviewResult } from "../debate/topicReview";
 
 interface Props {
@@ -30,15 +32,12 @@ interface Props {
 
 type ReviewState = "idle" | "working" | "done" | "error";
 
-const emptyTone: TopicTone = "serious";
-
 export function CustomTopicModal({
   isOpen, topic, configReady, reviewEnabled, onClose, onSave, onReview,
 }: Props) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [keywordsText, setKeywordsText] = useState("");
-  const [tone, setTone] = useState<TopicTone>(emptyTone);
   const [reviewState, setReviewState] = useState<ReviewState>("idle");
   const [reviewError, setReviewError] = useState<string | null>(null);
 
@@ -50,7 +49,6 @@ export function CustomTopicModal({
     setTitle(topic?.title ?? "");
     setDescription(topic?.description ?? "");
     setKeywordsText((topic?.keywords ?? []).join(", "));
-    setTone(resolveTone(topic?.tone));
     setReviewState("idle");
     setReviewError(null);
   }, [isOpen, topic]);
@@ -87,7 +85,6 @@ export function CustomTopicModal({
       setTitle(result.title);
       setDescription(result.description);
       setKeywordsText(result.keywords.join(", "));
-      setTone(result.tone);
       setReviewState("done");
     } catch (err) {
       setReviewError((err as Error).message);
@@ -111,7 +108,6 @@ export function CustomTopicModal({
       title: title.trim(),
       description: description.trim(),
       keywords: keywords.length > 0 ? keywords : undefined,
-      tone: resolveTone(tone),
       source: "custom",
       uses: topic?.uses ?? 0,
       likes: topic?.likes ?? 0,
@@ -124,7 +120,7 @@ export function CustomTopicModal({
   const reviewHint = !configReady
     ? "AI review is unavailable until an API key is configured (Settings → 🔑 Key Vault) — saving as-is."
     : reviewEnabled
-      ? "New topics are sent through the topic-review agent, which sharpens the title, adds search keywords, and picks a tone. You approve its edits before saving."
+      ? "New topics are sent through the topic-review agent, which sharpens the title and adds search keywords. You approve its edits before saving."
       : null;
 
   return (
@@ -217,39 +213,6 @@ export function CustomTopicModal({
               className={inputCls}
             />
             <p className="text-[11px] text-muted">Used by the sidebar search to find this topic again.</p>
-          </div>
-
-          {/* Tone radio */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-ink">
-              Tone <span className="text-muted font-normal">— how the debaters fight &amp; how strictly they're fact-checked</span>
-            </label>
-            <div role="radiogroup" aria-label="Tone" className="space-y-2">
-              {TONE_DEFS.map((def) => (
-                <label
-                  key={def.id}
-                  className={[
-                    "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors",
-                    tone === def.id
-                      ? "border-moderator-avatar bg-moderator-bg"
-                      : "border-border bg-white hover:bg-gray-50",
-                  ].join(" ")}
-                >
-                  <input
-                    type="radio"
-                    name="tone"
-                    value={def.id}
-                    checked={tone === def.id}
-                    onChange={() => setTone(def.id)}
-                    className="mt-0.5"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-ink">{def.label}</span>
-                    <span className="block text-[11px] text-muted leading-relaxed">{def.tagline}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
           </div>
 
           {reviewHint && (

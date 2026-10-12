@@ -11,11 +11,12 @@
 import { streamChat, ChatMessage } from "./llmClient";
 import {
   AgentId, AgentNames, DEFAULT_AGENT_NAMES, DebateStyle, Finding, LLMSettings,
-  resolveTone, ReviewState, Topic, TopicTone, toneDef, TurnReview,
+  ReviewState, Topic, TopicTone, toneDef, TurnReview,
 } from "../types";
 import { buildRedoInstruction, reviewTurn } from "./factCheck";
 import { resolveEndpoint } from "./gateway";
 import { getSessionStyle } from "./styles";
+import { getSessionTone } from "./tone";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -218,9 +219,9 @@ async function runTurn(
 ): Promise<{ content: string; errored: boolean }> {
   const { settings, callbacks, control } = deps;
 
-  // The active tone — a runtime choice, not baked into the topic. Anything
-  // unset or legacy resolves to a current tone via resolveTone().
-  const tone = resolveTone(topic.tone);
+  // The active tone — a single global, real-time choice. Read fresh each turn
+  // so changing it mid-debate applies from the next speaker onward.
+  const tone = getSessionTone();
   const toneInfo = toneDef(tone);
   const toneBlock = deps.registerBlocks?.[tone];
 

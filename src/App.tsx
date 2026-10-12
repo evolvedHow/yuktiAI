@@ -28,7 +28,8 @@ export default function App() {
     removeCustomTopic,
     topicMeta,
     topicVotes,
-    setTopicTone,
+    tone,
+    setTone,
     voteTopic,
     reviewTopic,
     activeTopic,
@@ -106,7 +107,8 @@ export default function App() {
         customTopics={customTopics}
         topicMeta={topicMeta}
         topicVotes={topicVotes}
-        onSetTopicTone={setTopicTone}
+        tone={tone}
+        onSelectTone={setTone}
         onVoteTopic={voteTopic}
         onEditTopic={openEditEditor}
         onRemoveCustomTopic={removeCustomTopic}
@@ -159,6 +161,7 @@ export default function App() {
           status={status}
           agentNames={agentNames}
           gateState={gateState}
+          tone={tone}
           onAdvance={advanceTurn}
           onPause={pauseGate}
           onResume={resumeGate}

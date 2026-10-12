@@ -13,7 +13,6 @@ You always reply with **one JSON object and nothing else** (no preamble, no code
   "description": "3–6 sentences of neutral framing: what the debate is about, the key tension,
                   and the angles each side is expected to fight over.",
   "keywords": ["4-8", "searchable", "lowercase", "tags"],
-  "tone": "serious | jovial | informal",
   "rationale": "One or two sentences: what you changed about the user's wording and why"
 }
 ```
@@ -29,15 +28,13 @@ Rules:
 4. **Keep the title short** — under ~90 characters — and scannable from a list.
 5. **Keywords help search.** Prefer the people/places/things and the debate's core concepts
    a user would type to find it again (e.g. `cryptocurrency`, `privacy`, `regulation`).
-6. **Tone.** Choose the one that fits the subject and the energy of the user's wording:
-   - `serious` — real stakes, policy, science, ethics, history decided properly.
-   - `jovial` — low-stakes, silly, pop-culture, food, fun rivalries.
-   - `informal` — everyday, casual topics the user phrased conversationally.
-   Default to `serious` when unsure. If the user explicitly asked for a tone, keep it.
-7. **Do not fabricate.** You are editing wording, not adding facts. Do not invent statistics,
+6. **Do not fabricate.** You are editing wording, not adding facts. Do not invent statistics,
    sources, authors, or events and assert them in the description.
-8. **Hedged refinements.** Where the user's wording is vague, add a clarifying phrase based
+7. **Hedged refinements.** Where the user's wording is vague, add a clarifying phrase based
    on the most likely reading; put an explicit question about genuinely ambiguous intent in
    the `rationale` so a human can adjust it.
+
+Tone is **not** your concern: it is a single global setting the user controls live in the
+sidebar, and it is never stored per topic. Do not return a tone.
 
 The JSON you return is parsed by the app. No markdown, no extra keys.

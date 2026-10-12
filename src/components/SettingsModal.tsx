@@ -475,8 +475,8 @@ export function SettingsModal({ settings, backendStatus, onSave, onClose, onOpen
               title="Review new topics with AI"
             >
               When you save a new topic, its prompt is first passed through the topic-review
-              agent (public/agents/topic-reviewer.md), which sharpens the title, adds search
-              keywords, and suggests a tone. The result is shown back to you before anything is
+              agent (public/agents/topic-reviewer.md), which sharpens the title and adds search
+              keywords. The result is shown back to you before anything is
               saved — your intent is never silently replaced. Skipped automatically until an API
               key is configured.
             </Toggle>

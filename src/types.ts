@@ -3,10 +3,10 @@
 export type AgentId = "moderator" | "advocate" | "critic" | "audience";
 
 /**
- * How a debate should be fought. A tone is picked with the radio buttons beside
- * each topic (or stored on a managed topic) rather than being forced by the
- * topic text itself. It changes emotional licence, vocabulary and how strictly
- * the accuracy layers judge the speakers:
+ * How a debate should be fought. Tone is a single **global** setting the user
+ * picks in real time (persisted in LLMSettings, applied to the next turn), never
+ * assigned to an individual topic. It changes emotional licence, vocabulary and
+ * how strictly the accuracy layers judge the speakers:
  *   - "serious"   real stakes; passionate but disciplined; fabrication is fatal.
  *   - "jovial"    playful; theatrical bias and comic exaggeration allowed, but
  *                 plausible-looking fakery is still rejected.
@@ -34,7 +34,7 @@ export interface ToneDef {
   registerFile: string;
 }
 
-/** The tone catalogue. The order here is the order shown in the radio rows. */
+/** The tone catalogue. The order here is the order shown in the global Tone picker. */
 export const TONE_DEFS: ToneDef[] = [
   {
     id: "serious",
@@ -81,12 +81,6 @@ export interface Topic {
   id: string;
   title: string;
   description: string;
-  /**
-   * How the debaters should fight. Sources that predate the tone system embed a
-   * `register:` instead; resolveTone() knows both. Tone is a runtime choice —
-   * the user can flip it with the radio buttons at any time.
-   */
-  tone?: TopicTone;
   /** Search keywords surfaced by the topic-review agent. */
   keywords?: string[];
   /** Source of the topic: "file" for YAML-loaded topics, "custom" for user-managed. */
@@ -102,18 +96,17 @@ export interface Topic {
 }
 
 /**
- * Per-topic counters and the current browser's tone override. Kept under one
+ * Per-topic counters and the current browser's stats. Kept under one
  * localStorage key so stats survive for both file topics and user topics.
  */
 export interface TopicMeta {
   uses: number;
   likes: number;
   dislikes: number;
-  tone?: TopicTone;
   lastUsedAt?: string;
 }
 
-export type TopicToneMap = Record<string, TopicMeta | undefined>;
+export type TopicMetaMap = Record<string, TopicMeta | undefined>;
 
 /** How the current visitor voted on a topic (toggle semantics, per browser). */
 export type TopicVote = "like" | "dislike" | null;
@@ -126,13 +119,14 @@ export interface TopicFileEntry {
 }
 
 /**
- * A topic as written in a .yml topic file. Files still declare the legacy
- * `register:` key (serious/frivolous); newer files may use `tone:` and
- * `keywords:`. normalizeTopicFile() folds both into the runtime Topic shape.
+ * A topic as written in a .yml topic file. Older files still declare a
+ * `register:`/`tone:` key per topic — these are accepted for backward
+ * compatibility but ignored, since tone is now a single global setting.
  */
-export interface RawTopic extends Omit<Topic, "tone"> {
+export interface RawTopic extends Topic {
+  /** Legacy per-topic tone — parsed but ignored. */
   tone?: TopicTone | LegacyRegister;
-  /** Legacy key — older files declare tone as a register. */
+  /** Legacy key — older files declare tone as a register. Parsed but ignored. */
   register?: TopicTone | LegacyRegister;
 }
 export interface AgentTopicConfig extends Partial<AgentDisplayMeta> {
@@ -155,16 +149,18 @@ export interface TopicFileContent {
   };
 }
 
-/** Snaps a file topic into the runtime Topic shape (legacy register → tone). */
+/** Snaps a file topic into the runtime Topic shape, dropping legacy tone keys. */
 export function normalizeTopic(raw: RawTopic): Topic {
   return {
-    ...raw,
-    tone: resolveTone(raw.tone ?? raw.register),
+    id: raw.id,
+    title: raw.title,
+    description: raw.description,
+    keywords: raw.keywords ?? [],
     source: raw.source ?? "file",
     uses: raw.uses ?? 0,
     likes: raw.likes ?? 0,
     dislikes: raw.dislikes ?? 0,
-    keywords: raw.keywords ?? [],
+    lastUsedAt: raw.lastUsedAt,
   };
 }
 
@@ -407,6 +403,12 @@ export interface LLMSettings {
    * LLM is unconfigured.
    */
   reviewNewTopics: boolean;
+  /**
+   * Global debate tone — a real-time user choice, applied from the next turn
+   * onward. Never assigned to an individual topic. Calibrates the register
+   * blocks and the fact-checker's strictness.
+   */
+  tone: TopicTone;
   typewriter: TypewriterSettings;
   factCheck: FactCheckSettings;
 }
@@ -445,6 +447,7 @@ export const DEFAULT_SETTINGS: LLMSettings = {
   gatewayPasscode:   "",
   keySource:         "server",
   reviewNewTopics:   envBool(import.meta.env.VITE_REVIEW_NEW_TOPICS, true),
+  tone:              DEFAULT_TOPIC_TONE,
   typewriter: {
     enabled:         envBool(import.meta.env.VITE_TYPEWRITER, true),
     mode:            envStr(import.meta.env.VITE_TYPEWRITER_MODE, "word") === "char" ? "char" : "word",

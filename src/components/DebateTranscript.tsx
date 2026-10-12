@@ -3,7 +3,7 @@
  */
 import { useEffect, useRef } from "react";
 import {
-  AgentNames, DebateStatus, GateState, Message, resolveTone, ReviewState, Topic, TONE_DEFS,
+  AgentNames, DebateStatus, GateState, Message, ReviewState, Topic, TopicTone, toneDef,
 } from "../types";
 import { MessageCard } from "./MessageCard";
 import { TurnGate } from "./TurnGate";
@@ -15,6 +15,8 @@ interface Props {
   status: DebateStatus;
   agentNames: AgentNames;
   gateState: GateState;
+  /** Global, real-time debate tone. */
+  tone: TopicTone;
   onAdvance: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -32,9 +34,9 @@ const REVIEW_LABEL: Partial<Record<ReviewState, string>> = {
   retrying: "Connection failed — retrying…",
 };
 
-/** How this topic is being fought — serious argument, playful comedy, or casual chat. */
-function ToneBadge({ tone }: { tone: Parameters<typeof resolveTone>[0] }) {
-  const def = TONE_DEFS.find((t) => t.id === resolveTone(tone)) ?? TONE_DEFS[0];
+/** How the debate is being fought — serious argument, playful comedy, or casual chat. */
+function ToneBadge({ tone }: { tone: TopicTone }) {
+  const def = toneDef(tone);
   const cls = def.id === "serious"
     ? "border-slate-300 bg-white text-slate-600"
     : def.id === "jovial"
@@ -54,7 +56,7 @@ function ToneBadge({ tone }: { tone: Parameters<typeof resolveTone>[0] }) {
 }
 
 export function DebateTranscript({
-  topic, messages, status, agentNames, gateState,
+  topic, messages, status, agentNames, gateState, tone,
   onAdvance, onPause, onResume, revealing, onSkipReveal, reviewState,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -100,7 +102,7 @@ export function DebateTranscript({
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <ToneBadge tone={topic.tone} />
+          <ToneBadge tone={tone} />
           <span
             className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${badge[status].cls}`}
           >

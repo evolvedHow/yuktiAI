@@ -2,17 +2,18 @@
  * Left sidebar:
  *   - YuktiAI branding
  *   - Topic-file dropdown (select which .yml file to load)
+ *   - Global Tone picker (Serious/Jovial/Informal) — a real-time, app-wide choice
  *   - Search box over topics
- *   - Topic list (scrollable) — each row shows a tone radio (Serious/Jovial/
- *     Informal), usage & like/dislike stats, and edit/remove for managed topics
+ *   - Topic list (scrollable) — each row shows usage & like/dislike stats plus
+ *     edit (any topic) and remove (managed topics) actions
  *   - Custom topic entry option
  *   - Audience controls (pinned to bottom)
  *   - On mobile: becomes a slide-in drawer triggered by a hamburger button
  */
 import { useMemo, useState } from "react";
 import {
-  DebateStatus, DebateStyle, resolveTone, Topic, TopicFileEntry,
-  TopicTone, TopicToneMap, TopicVote, TopicVoteMap, TONE_DEFS,
+  DebateStatus, DebateStyle, Topic, TopicFileEntry,
+  TopicMetaMap, TopicTone, TopicVote, TopicVoteMap, TONE_DEFS,
 } from "../types";
 import { AudienceControls } from "./AudienceControls";
 
@@ -23,11 +24,13 @@ interface Props {
   topics: Topic[];
   /** Manually entered topics, persisted in this browser. */
   customTopics: Topic[];
-  /** Per-topic stats + tone override (merged over file and managed topics). */
-  topicMeta: TopicToneMap;
+  /** Per-topic stats merged over file and managed topics. */
+  topicMeta: TopicMetaMap;
   /** This browser's own vote on each topic. */
   topicVotes: TopicVoteMap;
-  onSetTopicTone: (id: string, tone: TopicTone) => void;
+  /** Global, real-time tone for the whole app. */
+  tone: TopicTone;
+  onSelectTone: (tone: TopicTone) => void;
   onVoteTopic: (id: string, vote: Exclude<TopicVote, null>) => void;
   onEditTopic: (topic: Topic) => void;
   onRemoveCustomTopic: (id: string) => void;
@@ -51,7 +54,8 @@ export function Sidebar({
   customTopics,
   topicMeta,
   topicVotes,
-  onSetTopicTone,
+  tone,
+  onSelectTone,
   onVoteTopic,
   onEditTopic,
   onRemoveCustomTopic,
@@ -69,13 +73,12 @@ export function Sidebar({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  // Fold a topic's stored meta into it for display & tone.
+  // Fold a topic's stored stats into it for display.
   const withMeta = (topic: Topic): Topic => {
     const meta = topicMeta[topic.id];
     if (!meta) return topic;
     return {
       ...topic,
-      tone: meta.tone ?? topic.tone,
       uses: meta.uses,
       likes: meta.likes,
       dislikes: meta.dislikes,
@@ -164,6 +167,32 @@ export function Sidebar({
         </div>
       </div>
 
+      {/* Global tone picker — applies app-wide, changes take effect next turn */}
+      <div className="shrink-0 px-3 pb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted px-2 mb-1.5">
+          Tone
+        </p>
+        <div className="flex rounded-lg border border-border overflow-hidden text-xs">
+          {TONE_DEFS.map((def, i) => (
+            <button
+              key={def.id}
+              onClick={() => onSelectTone(def.id)}
+              aria-pressed={tone === def.id}
+              className={[
+                "flex-1 py-1.5 px-1.5 transition-colors leading-none",
+                i > 0 ? "border-l border-border" : "",
+                tone === def.id
+                  ? "bg-moderator-bg text-moderator-text font-semibold"
+                  : "bg-white text-ink hover:bg-surface",
+              ].join(" ")}
+              title={def.tagline}
+            >
+              {def.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Search */}
       <div className="shrink-0 px-3 pb-2">
         <div className="relative">
@@ -193,7 +222,7 @@ export function Sidebar({
             <span className="text-xl">📝</span>
             <span className="font-medium text-ink/80">Add Topic</span>
           </div>
-          <span className="block text-[10px] mt-1 text-muted/60">Type a topic, pick a tone, optionally review &amp; refine with AI</span>
+          <span className="block text-[10px] mt-1 text-muted/60">Type a topic, optionally review &amp; refine with AI</span>
         </button>
 
         {/* Managed topics */}
@@ -214,7 +243,6 @@ export function Sidebar({
                       onSelectTopic(topic);
                       setDrawerOpen(false);
                     }}
-                    onSetTone={(t) => onSetTopicTone(topic.id, t)}
                     onVote={(v) => onVoteTopic(topic.id, v)}
                     onEdit={() => onEditTopic(topic)}
                     onRemove={() => {
@@ -249,7 +277,6 @@ export function Sidebar({
                   onSelectTopic(topic);
                   setDrawerOpen(false);
                 }}
-                onSetTone={(t) => onSetTopicTone(topic.id, t)}
                 onVote={(v) => onVoteTopic(topic.id, v)}
                 onEdit={() => onEditTopic(topic)}
               />
@@ -309,124 +336,86 @@ export function Sidebar({
 // ── Topic row ────────────────────────────────────────────────────────────────
 
 function TopicRow({
-  topic, isActive, owned, vote, onSelect, onSetTone, onVote, onEdit, onRemove,
+  topic, isActive, owned, vote, onSelect, onVote, onEdit, onRemove,
 }: {
   topic: Topic;
   isActive: boolean;
   owned: boolean;
   vote: TopicVote;
   onSelect: () => void;
-  onSetTone: (tone: TopicTone) => void;
   onVote: (vote: Exclude<TopicVote, null>) => void;
   onEdit?: () => void;
   onRemove?: () => void;
 }) {
-  const tone = resolveTone(topic.tone);
   const activeCls = isActive
     ? "bg-moderator-bg border-moderator-border"
     : "bg-transparent border-transparent hover:bg-white hover:border-border";
 
   return (
     <div className={`rounded-lg border px-3 pt-2 pb-2 transition-colors ${activeCls}`} aria-current={isActive ? "page" : undefined}>
-      {/* Clickable title area */}
-      <button
-        onClick={onSelect}
-        className="w-full text-left group"
-        aria-label={`Start debate: ${topic.title}`}
-      >
-        <span className="flex items-center gap-1.5 leading-snug text-sm">
-          <span className="min-w-0 font-medium">{topic.title}</span>
-          <ToneBadge tone={tone} />
-        </span>
-        {topic.description && (
-          <span
-            className={[
-              "block text-[11px] mt-0.5 line-clamp-2 leading-relaxed",
-              isActive ? "text-moderator-text/70" : "text-muted group-hover:text-ink/60",
-            ].join(" ")}
-          >
-            {topic.description}
-          </span>
-        )}
-      </button>
+      {/* Title row — actions sit inline so they can never be clipped */}
+      <div className="flex items-start gap-1">
+        <button
+          onClick={onSelect}
+          className="flex-1 min-w-0 text-left group"
+          aria-label={`Start debate: ${topic.title}`}
+        >
+          <span className="block font-medium leading-snug text-sm">{topic.title}</span>
+          {topic.description && (
+            <span
+              className={[
+                "block text-[11px] mt-0.5 line-clamp-2 leading-relaxed",
+                isActive ? "text-moderator-text/70" : "text-muted group-hover:text-ink/60",
+              ].join(" ")}
+            >
+              {topic.description}
+            </span>
+          )}
+        </button>
 
-      {/* Tone radio + stats */}
-      <div className="flex items-center gap-1 mt-1.5">
-        {TONE_DEFS.map((def) => (
+        <span className="shrink-0 flex items-center gap-0.5 text-[11px]">
           <button
-            key={def.id}
-            onClick={() => onSetTone(def.id)}
-            title={def.tagline}
-            aria-pressed={tone === def.id}
-            className={[
-              "text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full border transition-colors",
-              tone === def.id
-                ? "border-moderator-avatar bg-moderator-avatar/15 text-moderator-text"
-                : "border-transparent text-muted/70 hover:border-border hover:text-ink",
-            ].join(" ")}
+            onClick={onEdit}
+            title="Edit this topic"
+            aria-label={`Edit ${topic.title}`}
+            className="text-muted hover:text-ink rounded p-0.5 transition-colors"
           >
-            {def.label}
-          </button>
-        ))}
-
-        {/* stats — small print below each topic */}
-        <span className="ml-auto flex items-center gap-2 text-[10px] text-muted">
-          <span title="Times debated" className="tabular-nums">▶ {(topic.uses ?? 0)}</span>
-          <button
-            onClick={() => onVote("like")}
-            title="Liked this debate"
-            aria-pressed={vote === "like"}
-            className={vote === "like" ? "text-green-700 font-semibold" : "hover:text-ink transition-colors"}
-          >
-            👍 <span className="tabular-nums">{topic.likes ?? 0}</span>
-          </button>
-          <button
-            onClick={() => onVote("dislike")}
-            title="Disliked this debate"
-            aria-pressed={vote === "dislike"}
-            className={vote === "dislike" ? "text-red-700 font-semibold" : "hover:text-ink transition-colors"}
-          >
-            👎 <span className="tabular-nums">{topic.dislikes ?? 0}</span>
+            ✎
           </button>
           {owned && (
-            <>
-              <button
-                onClick={onEdit}
-                title="Edit this topic"
-                className="hover:text-ink transition-colors ml-1"
-              >
-                ✎
-              </button>
-              <button
-                onClick={onRemove}
-                title="Remove this topic"
-                className="hover:text-red-600 transition-colors"
-              >
-                ✕
-              </button>
-            </>
+            <button
+              onClick={onRemove}
+              title="Remove this topic"
+              aria-label={`Remove ${topic.title}`}
+              className="text-muted hover:text-red-600 rounded p-0.5 transition-colors"
+            >
+              ✕
+            </button>
           )}
         </span>
       </div>
-    </div>
-  );
-}
 
-/** Pill showing the chosen tone for this topic. */
-function ToneBadge({ tone }: { tone: TopicTone }) {
-  const def = TONE_DEFS.find((t) => t.id === tone) ?? TONE_DEFS[0];
-  const cls = tone === "serious"
-    ? "border-slate-300 bg-white text-slate-600"
-    : tone === "jovial"
-      ? "border-amber-300 bg-amber-50 text-amber-700"
-      : "border-sky-300 bg-sky-50 text-sky-700";
-  return (
-    <span
-      title={def.tagline}
-      className={`shrink-0 inline-block text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border leading-none ${cls}`}
-    >
-      {def.label}
-    </span>
+      {/* stats — small print below each topic */}
+      <div className="flex items-center justify-end gap-2 mt-1 text-[10px] text-muted">
+        <span title="Times debated" className="tabular-nums">▶ {topic.uses ?? 0}</span>
+        <button
+          onClick={() => onVote("like")}
+          title="Liked this debate"
+          aria-pressed={vote === "like"}
+          className={vote === "like" ? "text-green-700 font-semibold" : "hover:text-ink transition-colors"}
+        >
+          👍 <span className="tabular-nums">{topic.likes ?? 0}</span>
+        </button>
+        <button
+          onClick={() => onVote("dislike")}
+          title="Disliked this debate"
+          aria-pressed={vote === "dislike"}
+          className={vote === "dislike" ? "text-red-700 font-semibold" : "hover:text-ink transition-colors"}
+        >
+          👎 <span className="tabular-nums">{topic.dislikes ?? 0}</span>
+        </button>
+      </div>
+    </div>
   );
 }
 

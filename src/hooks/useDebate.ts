@@ -14,7 +14,7 @@ import {
   AgentId, AgentNames, DebateStatus, DebateStyle, DEFAULT_AGENT_NAMES,
   DEFAULT_SETTINGS, GatewayInfo, GateState, LLMSettings, Message,
   normalizeTopic, ReviewState, resolveTone, Topic, TopicFileContent, TopicFileEntry,
-  TopicMeta, TopicTone, TopicToneMap, TopicVote, TopicVoteMap, TurnReview,
+  TopicMeta, TopicMetaMap, TopicTone, TopicVote, TopicVoteMap, TurnReview,
 } from "../types";
 import { loadPersonas, runDebate } from "../debate/orchestrator";
 import {
@@ -24,6 +24,7 @@ import {
 } from "../debate/gateway";
 import { reviewTopicPrompt, TopicReviewResult } from "../debate/topicReview";
 import { RevealQueue } from "../debate/typewriter";
+import { setSessionTone } from "../debate/tone";
 import {
   DEFAULT_ENGLISH_STYLE,
   getSessionStyle,
@@ -37,7 +38,7 @@ export type BackendStatus = "unknown" | "online" | "offline";
 const SETTINGS_KEY = "yuktiai_settings";
 const CUSTOM_TOPICS_KEY = "yuktiai_custom_topics";
 const MAX_SAVED_CUSTOM_TOPICS = 12;
-/** Per-topic counter/tone overrides, for both file and managed topics. */
+/** Per-topic usage/like/dislike counters, for both file and managed topics. */
 const TOPIC_META_KEY = "yuktiai_topic_meta";
 /** This browser's own like/dislike votes, so toggling works. */
 const TOPIC_VOTES_KEY = "yuktiai_topic_votes";
@@ -50,6 +51,9 @@ function loadSettings(): LLMSettings {
       return {
         ...DEFAULT_SETTINGS,
         ...stored,
+        // A stored tone that predates the global tone setting, or is malformed,
+        // resolves to the safe default.
+        tone: resolveTone(stored.tone),
         // Nested block needs its own merge so settings saved before the
         // typewriter existed still pick up the new defaults.
         typewriter: { ...DEFAULT_SETTINGS.typewriter, ...(stored.typewriter ?? {}) },
@@ -79,19 +83,18 @@ function loadCustomTopics(): Topic[] {
   }
 }
 
-function loadTopicMeta(): TopicToneMap {
+function loadTopicMeta(): TopicMetaMap {
   try {
     const raw = localStorage.getItem(TOPIC_META_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Record<string, TopicMeta | undefined>;
-    const out: TopicToneMap = {};
+    const out: TopicMetaMap = {};
     for (const [id, meta] of Object.entries(parsed)) {
       if (!meta || typeof meta !== "object") continue;
       out[id] = {
         uses: Number(meta.uses) || 0,
         likes: Number(meta.likes) || 0,
         dislikes: Number(meta.dislikes) || 0,
-        tone: resolveTone(meta.tone),
         lastUsedAt: typeof meta.lastUsedAt === "string" ? meta.lastUsedAt : undefined,
       };
     }
@@ -144,8 +147,8 @@ export function useDebate() {
   const [debateStyles, setDebateStyles] = useState<DebateStyle[]>([DEFAULT_ENGLISH_STYLE]);
   const [activeStyle, setActiveStyleState] = useState<DebateStyle>(DEFAULT_ENGLISH_STYLE);
   const [customTopics, setCustomTopics] = useState<Topic[]>(loadCustomTopics);
-  /** Per-topic stats + tone override, merged over both file and managed topics. */
-  const [topicMeta, setTopicMetaState] = useState<TopicToneMap>(loadTopicMeta);
+  /** Per-topic stats (uses/likes/dislikes), merged over both file and managed topics. */
+  const [topicMeta, setTopicMetaState] = useState<TopicMetaMap>(loadTopicMeta);
   /** This browser's like/dislike votes (toggle semantics). */
   const [topicVotes, setTopicVotesState] = useState<TopicVoteMap>(loadTopicVotes);
   /** true while buffered text is still being typed onto the screen. */
@@ -167,7 +170,7 @@ export function useDebate() {
   const baseAgentNamesRef = useRef<AgentNames>(DEFAULT_AGENT_NAMES);
 
   // Refs mirroring topicMeta/topicVotes for synchronous reads inside callbacks.
-  const topicMetaRef = useRef<TopicToneMap>(loadTopicMeta());
+  const topicMetaRef = useRef<TopicMetaMap>(loadTopicMeta());
   const topicVotesRef = useRef<TopicVoteMap>(loadTopicVotes());
 
   // Refs for mutable orchestrator controls (no re-render needed)
@@ -176,7 +179,7 @@ export function useDebate() {
   const abortRef = useRef<AbortController | null>(null);
 
   // ── Topic meta/vote persistence helpers (ref + state stay coherent) ────
-  const persistMeta = useCallback((next: TopicToneMap) => {
+  const persistMeta = useCallback((next: TopicMetaMap) => {
     topicMetaRef.current = next;
     setTopicMetaState(next);
     localStorage.setItem(TOPIC_META_KEY, JSON.stringify(next));
@@ -184,9 +187,9 @@ export function useDebate() {
 
   const patchMeta = useCallback((id: string, patch: Partial<TopicMeta>) => {
     const prev = topicMetaRef.current[id] ?? {
-      uses: 0, likes: 0, dislikes: 0, tone: undefined, lastUsedAt: undefined,
+      uses: 0, likes: 0, dislikes: 0, lastUsedAt: undefined,
     } satisfies TopicMeta;
-    const next: TopicToneMap = {
+    const next: TopicMetaMap = {
       ...topicMetaRef.current,
       [id]: { ...prev, ...patch, likes: Math.max(0, prev.likes), dislikes: Math.max(0, prev.dislikes) },
     };
@@ -382,6 +385,19 @@ export function useDebate() {
     });
   }, []);
 
+  // ── Global tone ──────────────────────────────────────────────────────────
+  // Mirror the persisted tone into the orchestrator's session singleton so a
+  // change made mid-debate applies from the next turn onward. Read per turn by
+  // orchestrator.runTurn(); never stored per topic.
+  useEffect(() => {
+    setSessionTone(resolveTone(settings.tone));
+  }, [settings.tone]);
+
+  /** Sets the global debate tone (sidebar picker). A real-time, app-wide choice. */
+  const setTone = useCallback((tone: TopicTone) => {
+    updateSettings({ tone: resolveTone(tone) });
+  }, [updateSettings]);
+
   // ── Custom / managed topics ────────────────────────────────────────────────
   const saveCustomTopics = useCallback((next: Topic[]) => {
     localStorage.setItem(CUSTOM_TOPICS_KEY, JSON.stringify(next));
@@ -406,15 +422,10 @@ export function useDebate() {
       source: "custom",
     });
     saveCustomTopic(normalized.id, normalized);
-    // Never lose a tone the user picked for a managed topic.
-    if (normalized.tone && normalizeTopic(topic).tone) {
-      patchMeta(normalized.id, { tone: normalized.tone });
-    }
-  }, [saveCustomTopic, patchMeta]);
+  }, [saveCustomTopic]);
 
   /** Updates an existing managed topic. */
   const updateCustomTopic = useCallback((id: string, patch: Partial<Topic>) => {
-    if (patch.tone) patchMeta(id, { tone: resolveTone(patch.tone) });
     setCustomTopics((prev) => {
       const next = prev.map((t) =>
         t.id === id ? normalizeTopic({ ...t, ...patch, id }) : t,
@@ -422,7 +433,7 @@ export function useDebate() {
       saveCustomTopics(next);
       return next;
     });
-  }, [saveCustomTopics, patchMeta]);
+  }, [saveCustomTopics]);
 
   const removeCustomTopic = useCallback((id: string) => {
     setCustomTopics((prev) => {
@@ -431,19 +442,6 @@ export function useDebate() {
       return next;
     });
   }, [saveCustomTopics]);
-
-  /** Picks a tone for a topic (radio buttons in the sidebar). Stored in meta so
-   *  it applies to file topics too. */
-  const setTopicTone = useCallback((id: string, tone: TopicTone) => {
-    patchMeta(id, { tone: resolveTone(tone) });
-    setCustomTopics((prev) => {
-      const changed = prev.some((t) => t.id === id);
-      if (!changed) return prev;
-      const next = prev.map((t) => (t.id === id ? normalizeTopic({ ...t, tone }) : t));
-      saveCustomTopics(next);
-      return next;
-    });
-  }, [patchMeta, saveCustomTopics]);
 
   /** Toggles this browser's like/dislike vote and adjusts the counters. */
   const voteTopic = useCallback((id: string, vote: Exclude<TopicVote, null>) => {
@@ -481,7 +479,6 @@ export function useDebate() {
     if (!meta) return topic;
     return {
       ...topic,
-      tone: meta.tone ?? topic.tone,
       uses: meta.uses ?? topic.uses ?? 0,
       likes: meta.likes ?? topic.likes ?? 0,
       dislikes: meta.dislikes ?? topic.dislikes ?? 0,
@@ -515,7 +512,7 @@ export function useDebate() {
       return;
     }
 
-    // Lock the tone/stat overlay into the topic that actually debates.
+    // Lock the stored stats into the topic that actually debates.
     const effective = effectiveTopic(topic);
 
     // Live reachability check before committing to a debate: the config may
@@ -765,7 +762,8 @@ export function useDebate() {
     removeCustomTopic,
     topicMeta,
     topicVotes,
-    setTopicTone,
+    tone: resolveTone(settings.tone),
+    setTone,
     voteTopic,
     reviewTopic,
     activeTopic,

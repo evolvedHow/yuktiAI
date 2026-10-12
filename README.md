@@ -178,36 +178,34 @@ topics:
   - id: unique_slug
     title: Display Name
     description: One-paragraph framing shown in the sidebar and injected into agent prompts.
-    tone: serious        # or: jovial, informal
     keywords: [elections, ai, regulation]   # optional — powers sidebar search
 ```
 
-**Tone** — how the topic is fought, chosen per topic from radio buttons
-(**Serious / Jovial / Informal**) in the sidebar. `serious` (the default) has
-real stakes and expects sincere, evidence-facing argument. `jovial` (formerly
-called *frivolous* — the old key still works) is a playful register: comic
-exaggeration, theatrical bias and low-stakes trash-talk are the genre.
-`informal` is a relaxed, conversational register without the comedy licence.
-Tone calibrates the fact-checker (see
-[Accuracy](#accuracy-fabricated-links-and-claims)) and is shown as a badge on
-each topic and in the debate header. Stored tone lives per-browser in
-`yuktiai_topic_meta`, so changing it only affects this visitor — the `.yml` file
-is untouched.
+**Tone** — a single **global** setting, picked live from the **Tone** control in the
+sidebar (**Serious / Jovial / Informal**) and applied from the next turn onward. It is
+never assigned to an individual topic — legacy `tone:`/`register:` keys in the `.yml`
+files are ignored. `serious` (the default) has real stakes and expects sincere,
+evidence-facing argument. `jovial` (formerly called *frivolous*) is a playful register:
+comic exaggeration, theatrical bias and low-stakes trash-talk are the genre. `informal`
+is a relaxed, conversational register without the comedy licence. Tone calibrates the
+fact-checker (see [Accuracy](#accuracy-fabricated-links-and-claims)) and is shown as a
+badge in the debate header. The choice persists per-browser with the rest of your
+settings.
 
 **Typed in / edited** — the **📝 Add Topic** button opens the topic editor:
-title, description, optional search keywords, and a tone radio. Every topic —
-including ones that come from the `.yml` files — can be liked/disliked and shows
-small usage and vote counters under its title; managed topics can be edited (✎)
-or removed (✕) from the sidebar.
+title, description and optional search keywords. Every topic — including ones that come
+from the `.yml` files — can be liked/disliked and shows small usage and vote counters
+under its title; every topic can be edited (✎), and managed topics removed (✕), from the
+sidebar.
 
 **AI-reviewed** — new topics can be sent through the **topic-review agent**
-([`public/agents/topic-reviewer.md`](public/agents/topic-reviewer.md)), which
-sharpens the title, adds search keywords, and suggests a tone. The refined
-version is shown back and must be approved before saving — the agent edits the
-user's words, never silently replaces their intent. Auto-review on save (toggle
-in Settings → New Topics, default on) is skipped automatically until an LLM is
-configured; the ✨ Review &amp; refine button in the editor runs it on demand.
-Reviewed topics can be searched by their keywords in the sidebar search box.
+([`public/agents/topic-reviewer.md`](public/agents/topic-reviewer.md)), which sharpens
+the title and adds search keywords. The refined version is shown back and must be
+approved before saving — the agent edits the user's words, never silently replaces their
+intent. Auto-review on save (toggle in Settings → New Topics, default on) is skipped
+automatically until an LLM is configured; the ✨ Review &amp; refine button in the editor
+runs it on demand. Reviewed topics can be searched by their keywords in the sidebar
+search box.
 
 ---
 
