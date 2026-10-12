@@ -334,8 +334,8 @@ export function useDebate() {
       .then((r) => setBackendStatus(r.ok ? "online" : "offline"))
       .catch(() => { if (!controller.signal.aborted) setBackendStatus("offline"); });
 
-    // The Python backend has no /providers route; a failure here just means
-    // "no profile picker", not "gateway down".
+    // A missing /providers route just means "no profile picker", not "gateway
+    // down" — the old Python backend exposed only /health + /v1.
     fetchGatewayInfo(url, controller.signal)
       .then(setGatewayInfo)
       .catch(() => { if (!controller.signal.aborted) setGatewayInfo(null); });
